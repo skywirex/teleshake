@@ -45,17 +45,17 @@ z = function.renew_names_in_list (days)
 if z != []:
     telegram.send_message("Renewed names {}:".format(z) + "\n", chat_id)
 
-# #### Bid at specific block ####
-# block = 77927
-# name = "gdns"
-# bid_value = 5
-# lockup_value = 10
+#### Bid at specific block ####
+block = 77927
+name = "gdns"
+bid_value = 5
+lockup_value = 10
 
-# x = function.bid_at_block (block, name, bid_value, lockup_value)
+x = function.bid_at_block (block, name, bid_value, lockup_value)
 
-# if x != None:
-#     message = "Biding name: {}".format(name) + "\n" + "Value: {}".format(bid_value) + "\n" + "Mask: {}".format(lockup_value) + "\n" + json.dumps(x, indent=4)
-#     chat_id = telegram.get_chat_id()
-#     telegram.send_message(message, chat_id)
+if x != None:
+    message = "Biding name: {}".format(name) + "\n" + "Value: {}".format(bid_value) + "\n" + "Mask: {}".format(lockup_value) + "\n" + json.dumps(x, indent=4)
+    chat_id = telegram.get_chat_id()
+    telegram.send_message(message, chat_id)
     
-# #### Bid at specific block ####
+#### Bid at specific block ####
