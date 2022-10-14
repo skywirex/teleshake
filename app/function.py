@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import json
+import json 
 import requests
+import os
 import node as node
 import config as config
 import wallet as wallet
@@ -32,13 +33,13 @@ def names_until_expire():
     ### Construct dictionary 
     names_until_expire = dict(zip(registered_names_in_wallet,daysUntilExpire))
     ### Export to json file
-    file_names_until_expire = '../data/output_names_until_expire.json'
+    file_names_until_expire = os.path.join('..','data','output_names_until_expire.json')
     with open(file_names_until_expire, 'w') as f_obj:
         json.dump(names_until_expire, f_obj, indent=4)
     return names_until_expire
 
 def expire_in_days (number):
-    file_names_until_expire = '../data/output_names_until_expire.json'
+    file_names_until_expire = os.path.join('..','data','output_names_until_expire.json')
     with open(file_names_until_expire) as f_obj:
         names_until_expire = json.load(f_obj)
         expire_in_days = []
