@@ -1,3 +1,4 @@
 app/config.py
 app/test.py
+app/__pycache__
 data/output_names_until_expire.json
