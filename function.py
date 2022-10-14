@@ -4,10 +4,9 @@ import json
 import requests
 import os
 import config as config
-import node as node
-import wallet as wallet
 
-
+from hsapi import node
+from hsapi import wallet
 ##### END IMPORT #####
 
 # Convert to dollarydoo

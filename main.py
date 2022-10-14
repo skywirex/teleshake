@@ -3,10 +3,12 @@
 import json
 import requests
 import function as function
-import node as node
-import wallet as wallet
 import telegrambot as telegram
 import config as config
+
+from hsapi import node
+from hsapi import wallet
+
 ##### END IMPORT #####
 
 #### GENERAL INFORMATION #####
