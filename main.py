@@ -8,7 +8,6 @@ import config as config
 
 from hsapi import node
 from hsapi import wallet
-
 ##### END IMPORT #####
 
 #### GENERAL INFORMATION #####

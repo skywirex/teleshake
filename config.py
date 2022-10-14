@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-API = "<>"
-passphrase = "<>"
-WalletID = "<>"
-Account = "<>"
+API = "60d3c13ff256f8c4580352e3990baadb204d1100"
+passphrase = "haymocua123"
+WalletID = "skywirex"
+Account = "default"
 
 #Telegram bot
 ##https://www.codementor.io/@garethdwyer/building-a-telegram-bot-using-python-part-1-goi5fncay
