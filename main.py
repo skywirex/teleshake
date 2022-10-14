@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import json
 import requests
-import function
+import function as function
 import node as node
 import wallet as wallet
 import telegrambot as telegram

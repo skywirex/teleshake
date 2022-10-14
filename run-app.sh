@@ -1,3 +1,3 @@
 #!/bin/bash
 
-cd $HOME/teleshake/app && python ./main.py
+cd $HOME/teleshake && python ./main.py
