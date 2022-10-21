@@ -1,4 +1,4 @@
-## hns-x
+## teleshake
 
 
 ### Update python
@@ -41,5 +41,5 @@ URL = "https://api.telegram.org/bot{}/".format(TOKEN)
 Run `crontab -e` and put the following at the end of file
 
 ```
-0 * * * * /root/hns-x/run-app.sh
+0 * * * * /root/teleshake/main.py
 ```
