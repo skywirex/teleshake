@@ -41,5 +41,5 @@ URL = "https://api.telegram.org/bot{}/".format(TOKEN)
 Run `crontab -e` and put the following at the end of file
 
 ```
-0 * * * * /root/teleshake/main.py
+0 * * * * /root/teleshake/run-main.sh
 ```

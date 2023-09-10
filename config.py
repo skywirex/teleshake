@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-API = "60d3c13ff256f8c4580352e3990baadb204d1100"
+API = "284462689516d12b911ca3294b42d7359bf56bfd"
 passphrase = "haymocua123"
 WalletID = "skywirex"
 Account = "default"
