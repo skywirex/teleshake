@@ -46,6 +46,8 @@ if y != []:
 z = function.renew_names_in_list (days)
 if z != []:
     telegram.send_message("Renewed names {}:".format(z) + "\n", chat_id)
+else:
+    telegram.send_message("There are no names to renew on the Handshake block {}".format(block_height) + "\n", chat_id)
 
 #### Bid at specific block ####
 block = 77927

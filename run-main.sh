@@ -1,3 +1,3 @@
 #!/bin/bash
 
-python $HOME/teleshake/main.py >> log.txt
+cd $HOME/teleshake && python main.py >> log.txt
