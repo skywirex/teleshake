@@ -84,7 +84,7 @@ def reveal_names_in_wallet ():
     reveal = []
     for name in names_in_wallet:
         if name['state'] == 'REVEAL':
-             wallet.sendREVEAL (config.passphrase,name['name'])
+             wallet.sendREVEAL (passphrase,name['name'])
              reveal.append(name['name'])
     return reveal
 
@@ -102,7 +102,7 @@ def renew_names_in_list (days):
     names_to_be_renews = expire_in_days (days)
     renew = []
     for name in names_to_be_renews:
-        wallet.sendRENEW (config.passphrase, name)
+        wallet.sendRENEW (passphrase, name)
         renew.append(name)
     return renew
 
@@ -110,7 +110,7 @@ def renew_names_in_list (days):
 def bid_at_block (block, name, bid_value, lockup_value):
     block_height = node.block_height()
     if  block_height == block:
-        wallet.sendBID (config.passphrase, name, todollarydoo(bid_value), todollarydoo(lockup_value))
+        wallet.sendBID (passphrase, name, todollarydoo(bid_value), todollarydoo(lockup_value))
     return
 ##### END CUSTOM WALLET FUNCTION #####
 
