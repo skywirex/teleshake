@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 import json
 import requests
-import os, sys
+import os
+from dotenv import load_dotenv
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# import ../config.py
-import config
+# Load environment variables
+load_dotenv()
 
-API = config.API
+API = os.getenv('API')
 NodeURL = "http://x:{}@localhost:12037/".format(API)
 
 def block_height ():

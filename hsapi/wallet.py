@@ -2,17 +2,17 @@
 # -*- coding: utf-8 -*-
 import json
 import requests
-import os, sys
+import os
+from dotenv import load_dotenv
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Load environment variables
+load_dotenv()
 
-# import ../config.py
-import config
 
-API = config.API
+API = os.getenv('API')
 WalletURL = "http://x:{}@127.0.0.1:12039/wallet/".format(API)
-WalletID = config.WalletID
-Account = config.Account
+WalletID = os.getenv('WalletID')
+Account = os.getenv('Account')
 
 # Get Balance
 def getBalance (account):
