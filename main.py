@@ -152,10 +152,10 @@ def main ():
             renewed_names = renew_names ( wallet )
             info = get_wallet_and_node_info ( wallet, hsd )
 
-            message_lines = [ f"Teleshake bot Update ({datetime.now ().strftime ( '%Y-%m-%d %H:%M:%S' )})" ]
+            message_lines = [ f"Teleshake Update ({datetime.now ().strftime ( '%Y-%m-%d %H:%M:%S' )})" ]
 
             # Wallet and node info (moved above renewal results)
-            message_lines.append ( "\nNODE/WALLET INFO:" )
+            message_lines.append ( "\nINFO:" )
             message_lines.append ( f"Block Height: {info [ 'block_height' ]} | Account: {info [ 'account' ]}" )
             message_lines.append ( f"Balance: {info [ 'balance' ]} HNS" )
             message_lines.append ( f"Address: {info [ 'receiving_address' ]}" )
