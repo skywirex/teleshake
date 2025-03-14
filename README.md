@@ -176,3 +176,17 @@ kill -9 <pid>
 ```bash
 sudo systemctl stop handshake-bot
 ```
+
+### Project Structure
+
+```
+project/
+│
+├── HSD_API.py         # Handshake node API client
+├── WALLET_API.py      # Handshake wallet API client
+├── bot.py             # Telegram bot functionality
+├── main.py            # Main script
+├── .env               # Environment variables
+├── requirements.txt   # Python dependencies
+└── wallet_names.json  # Generated JSON file
+```
