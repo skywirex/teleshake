@@ -69,7 +69,6 @@ def fetch_and_save_names ( wallet: WALLET ) -> None:
             renewal_height = name_info.get ( "renewal", 0 )
             names_data [ name ] = {
                 "expiration_date": expiration_date.isoformat (),
-                "renewal_height": renewal_height,
                 "days_until_expire": name_info.get ( "stats", { } ).get ( "daysUntilExpire", None )
             }
         except Exception as e:
