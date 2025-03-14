@@ -1,61 +1,178 @@
-# Teleshake - User Guide
+## Prerequisites
 
-## Update Python
+### Python Installed
+Ensure Python 3.7+ is installed on your system. Check with:
 
-To ensure your Teleshake program runs smoothly, you need to update Python and install necessary packages. Follow these steps:
+```bash
+python3 --version
+```
 
-1. Update Python to Python 3 and install pip3:
-   ```bash
-   update-alternatives --install /usr/bin/python python /usr/bin/python3 1
-   apt install python3-pip
-   ```
+If not installed, download it from [python.org](https://www.python.org/) or use a package manager (e.g., `apt`, `brew`).
 
-2. Install the 'requests' package using pip3:
-   ```bash
-   pip3 install requests
-   ```
+### Handshake Node (hsd)
+A running `hsd` instance (with wallet enabled) is required, as `main.py` interacts with it via `HSD_API.py` and `WALLET_API.py`. Ensure it’s configured with API keys and accessible at the addresses/ports specified in `.env`.
 
-## Configure Your Program
+### Telegram Bot
+A Telegram bot must be created via [BotFather](https://t.me/BotFather) to get a `TELEGRAM_BOT_TOKEN`, and you need a `TELEGRAM_CHAT_ID` for the target chat.
 
-Before you can use Teleshake, you need to configure it properly. Follow these steps:
+## Step-by-Step Instructions to Run `main.py`
 
-1. **Run hsd in a Docker container and test the endpoint:**
-   Use the following command to test the hsd endpoint:
-   ```bash
-   curl http://x:<your-api>0@127.0.0.1:12037
-   ```
+### 1. Set Up the Environment
+Navigate to the project directory:
 
-2. **Prepare the following information:**
-   ```bash
-   API = "<your-API>"
-   passphrase = "<your-pass>"
-   WalletID = "<your-wallet-ID>"
-   Account = "default"
-   ```
+```bash
+cd /path/to/project
+```
 
-3. Modify the information in the `config.py` file according to the details you prepared.
+### 2. Install Dependencies
+Ensure `requirements.txt` includes all necessary packages. Here’s a sample `requirements.txt` based on the script’s needs:
 
-4. For sending messages to Telegram, you'll need the following information:
-   ```bash
-   TOKEN = "<your-token>"
-   CHAT_ID = "<your-chat-id>"
-   URL = "https://api.telegram.org/bot{}/".format(TOKEN)
-   ```
+```
+requests
+python-dotenv
+```
 
-   Update the `config.py` file with this information.
+Install the dependencies:
 
-## Setting up Cron
+```bash
+pip3 install -r requirements.txt
+```
 
-To automate Teleshake and run it at specific intervals, you can use the cron job scheduler. Follow these steps:
+- `requests`: For HTTP requests in `bot.py`, `HSD_API.py`, and `WALLET_API.py`.
+- `python-dotenv`: To load `.env` variables.
 
-1. Open your crontab file for editing:
-   ```bash
-   crontab -e
-   ```
+If `requirements.txt` is missing or incomplete, create/update it with the above content and run the command.
 
-2. Add the following line at the end of the file to run Teleshake every hour:
-   ```bash
-   0 * * * * /root/teleshake/run-main.sh
-   ```
+### 3. Configure `.env`
+Verify your `.env` file contains all required variables. Example:
 
-   This will execute Teleshake's main script every hour.
+```
+WALLET_API=your_wallet_api_key
+WALLET_ADDRESS=127.0.0.1
+WALLET_PORT=12039
+WALLET_ID=primary
+WALLET_PASSPHRASE=your_secure_passphrase
+WALLET_MNEMONIC=your_12_or_24_word_mnemonic
+NODE_API_KEY=your_node_api_key
+NODE_HOST=127.0.0.1
+NODE_PORT=12037
+RENEWAL_THRESHOLD_DAYS=30
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
+LOOP_PERIOD_SECONDS=3600  # 1 hour
+```
+
+Replace placeholders (e.g., `your_wallet_api_key`) with actual values.
+
+Ensure `hsd` is running at `NODE_HOST:NODE_PORT` and the wallet at `WALLET_ADDRESS:WALLET_PORT`.
+
+### 4. Verify `hsd` and Wallet Are Running
+Start your Handshake node with wallet support if not already running:
+
+```bash
+hsd --api-key=your_node_api_key --wallet-api-key=your_wallet_api_key
+```
+
+Use `--testnet` if testing on the test network.
+
+Confirm it’s accessible (e.g., via `curl http://127.0.0.1:12037` with the API key).
+
+### 5. Run `main.py`
+Run the script in the foreground to test it:
+
+```bash
+python3 main.py
+```
+
+**Expected Output:** It will check the wallet, fetch names, renew if needed, send a Telegram message, and sleep for `LOOP_PERIOD_SECONDS` (e.g., 3600 seconds). Example:
+
+```
+Wallet 'primary' already exists
+Names data saved to wallet_names.json
+Notification sent. Sleeping for 3600 seconds...
+```
+
+### 6. Run in the Background (Optional)
+Since `main.py` runs in a loop, you’ll likely want it to persist. Use one of these methods:
+
+#### Using `nohup` (Linux/macOS):
+```bash
+nohup python3 main.py > output.log 2>&1 &
+```
+Logs output to `output.log`.
+
+Check the process with `ps aux | grep main.py`.
+
+#### Using `screen` (Linux/macOS):
+```bash
+screen -S handshake-bot
+python3 main.py
+```
+Detach with `Ctrl+A, D`. Reattach with `screen -r handshake-bot`.
+
+#### As a `systemd` Service (Linux, recommended for production):
+Create `/etc/systemd/system/handshake-bot.service`:
+
+```
+[Unit]
+Description=Handshake Wallet Renewal Bot
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /path/to/project/main.py
+WorkingDirectory=/path/to/project
+Restart=always
+User=your_username
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then:
+
+```bash
+sudo systemctl enable handshake-bot
+sudo systemctl start handshake-bot
+```
+
+Check status:
+```bash
+sudo systemctl status handshake-bot
+```
+
+### 7. Monitor Execution
+
+#### Telegram
+Verify you receive messages like:
+
+```
+Handshake Wallet Update (2025-03-14 10:00:00)
+<b>Wallet/Node Info:</b>
+Block Height: 268271
+Account: primary
+Balance: 123.5 HNS
+Address: <a href='hs1q1234567890abcdefxyz'>hs1q12...fxyz</a>
+
+<b>Renewals:</b>
+No renewals
+```
+
+#### Console/Log
+Check `output.log` (if using `nohup`) or the terminal for errors.
+
+### 8. Stop the Script (If Needed)
+
+#### Foreground
+Press `Ctrl+C`.
+
+#### Background (`nohup`)
+Find the PID (`ps aux | grep main.py`) and kill it:
+
+```bash
+kill -9 <pid>
+```
+
+#### `systemd`
+```bash
+sudo systemctl stop handshake-bot
+```
