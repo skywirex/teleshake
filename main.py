@@ -1,150 +1,184 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
 import json
 import os
-import telegrambot as telegram
-from hsapi import node  # Import from folder hsapi
-from hsapi import wallet
+import time
+from datetime import datetime, timedelta
+from typing import Dict, Any
 from dotenv import load_dotenv
+from HSD_API import HSD
+from WALLET_API import WALLET
+from bot import send_telegram_message  # Import from bot.py
+
 # Load environment variables
-load_dotenv()
-# -----END IMPORT----- #
+load_dotenv ()
 
-# Keys
-passphrase = os.getenv('passphrase')
-Account = os.getenv('Account')
+# Renewal configuration from .env
+RENEWAL_THRESHOLD_DAYS = int ( os.getenv ( 'RENEWAL_THRESHOLD_DAYS', 30 ) )
+LOOP_PERIOD_SECONDS = int(os.getenv('LOOP_PERIOD_SECONDS', 3600))  # Default to 1 hour (3600 seconds)
 
-# Convert to dollarydoo
+# Wallet configuration from .env
+WALLET_ID = os.getenv ( 'WALLET_ID', 'primary' )
+WALLET_PASSPHRASE = os.getenv ( 'WALLET_PASSPHRASE', '' )
+WALLET_MNEMONIC = os.getenv ( 'WALLET_MNEMONIC', '' )
 
-
-def todollarydoo(amount):
-    value = amount * 1000000
-    return value
-
-
-def tohns(amount):
-    value = amount / 1000000
-    return value
+# JSON file to store name data
+NAMES_JSON_FILE = 'wallet_names.json'
 
 
-# -----GENERAL INFORMATION----- #
-
-block_height = node.block_height()
-balance = wallet.getBalance(Account)
-spendable_balance = tohns(balance['unconfirmed'] - balance['lockedUnconfirmed'])
-get_account_info = wallet.getAccountInfo()
-address = get_account_info["receiveAddress"]
-
-message = "Current Handshake block is: {}".format(block_height) + "\n$HNS Balance: {}".format(
-    spendable_balance) + "\n" + address
-chat_id = telegram.get_chat_id()
-telegram.send_message(message, chat_id)
-
-# -----END GENERAL INFORMATION----- #
-
-# -----BEGIN CUSTOM NODE FUNCTION----- #
-
-# Export name and expire day to a json file in data folder
+def check_and_create_wallet ( wallet: WALLET ) -> None:
+    """Check if wallet exists, create it if it doesn't."""
+    response = wallet.get_wallet_info ( WALLET_ID )
+    if "error" in response:
+        print ( f"Wallet '{WALLET_ID}' does not exist or is inaccessible. Creating it..." )
+        create_response = wallet.create_wallet (
+            passphrase=WALLET_PASSPHRASE,
+            id=WALLET_ID,
+            mnemonic=WALLET_MNEMONIC
+        )
+        if "error" in create_response:
+            raise RuntimeError ( f"Failed to create wallet: {create_response [ 'error' ]}" )
+        print ( f"Wallet '{WALLET_ID}' created successfully" )
+    else:
+        print ( f"Wallet '{WALLET_ID}' already exists" )
 
 
-def names_until_expire():
-    # Get registered name and days until expire directly in your wallet
-    names_in_wallet = wallet.getWalletOwnNames()
-    registered_names_in_wallet = []
-    daysUntilExpire = []
-    for i in names_in_wallet:
-        if i['registered'] == True:
-            registered_names_in_wallet.append(i['name'])
-            daysUntilExpire.append(i['stats']['daysUntilExpire'])
-    # Construct dictionary
-    names_until_expire = dict(zip(registered_names_in_wallet, daysUntilExpire))
-    # Export to json file
-    file_names_until_expire = 'names_expired.json'
-    with open(file_names_until_expire, 'w') as f_obj:
-        json.dump(names_until_expire, f_obj, indent=4)
-    return names_until_expire
+def get_expiration_date ( name_info: Dict [ str, Any ] ) -> datetime:
+    """Extract expiration date from name info using daysUntilExpire."""
+    stats = name_info.get ( "stats", { } )
+    days_until_expire = stats.get ( "daysUntilExpire", None )
+
+    if days_until_expire is None:
+        # Fallback if daysUntilExpire is missing
+        print ( f"Warning: No daysUntilExpire for '{name_info [ 'name' ]}'; assuming distant future expiration" )
+        return datetime.now () + timedelta ( days=365 * 2 )  # Default to 2 years
+
+    expiration_date = datetime.now () + timedelta ( days=days_until_expire )
+    return expiration_date
 
 
-def expire_in_days(number):
-    file_names_until_expire = 'names_expired.json'
-    with open(file_names_until_expire) as f_obj:
-        names_until_expire = json.load(f_obj)
-        expire_in_days = []
-        for name in names_until_expire:
-            if names_until_expire[name] < number:
-                expire_in_days.append(name)
-    return expire_in_days
+def fetch_and_save_names ( wallet: WALLET ) -> None:
+    """Fetch owned names and save to JSON file."""
+    response = wallet.get_wallet_names_own ( WALLET_ID )
+    if "error" in response:
+        raise RuntimeError ( f"Failed to fetch wallet names: {response [ 'error' ]}" )
+
+    names_data = { }
+    for name_info in response:
+        name = name_info [ "name" ]
+        try:
+            expiration_date = get_expiration_date ( name_info )
+            renewal_height = name_info.get ( "renewal", 0 )
+            names_data [ name ] = {
+                "expiration_date": expiration_date.isoformat (),
+                "renewal_height": renewal_height,
+                "days_until_expire": name_info.get ( "stats", { } ).get ( "daysUntilExpire", None )
+            }
+        except Exception as e:
+            print ( f"Error processing name '{name}': {str ( e )}" )
+
+    with open ( NAMES_JSON_FILE, 'w' ) as f:
+        json.dump ( names_data, f, indent=4 )
+    print ( f"Names data saved to {NAMES_JSON_FILE}" )
 
 
-##### END CUSTOM NODE FUNCTION #####
+def renew_names ( wallet: WALLET ) -> list:
+    """Read names from JSON, renew if expiring soon using send_renew, and return renewed names."""
+    if not os.path.exists ( NAMES_JSON_FILE ):
+        raise FileNotFoundError ( f"{NAMES_JSON_FILE} not found. Run fetch_and_save_names first." )
+
+    with open ( NAMES_JSON_FILE, 'r' ) as f:
+        names_data = json.load ( f )
+
+    current_date = datetime.now ()
+    threshold_date = current_date + timedelta ( days=RENEWAL_THRESHOLD_DAYS )
+    renewed_names = [ ]
+
+    for name, data in names_data.items ():
+        expiration_date = datetime.fromisoformat ( data [ "expiration_date" ] )
+        if expiration_date <= threshold_date:
+            print ( f"Renewing name '{name}' expiring on {expiration_date}" )
+            response = wallet.send_renew (
+                id=WALLET_ID,
+                passphrase=WALLET_PASSPHRASE,
+                name=name,
+                sign=True,
+                broadcast=True
+            )
+            if "error" in response:
+                print ( f"Failed to renew '{name}': {response [ 'error' ]}" )
+            else:
+                renewed_names.append ( name )
+                print ( f"Successfully renewed '{name}'" )
+
+    return renewed_names
 
 
-##### BEGIN CUSTOM WALLET FUNCTION #####
+def get_wallet_and_node_info ( wallet: WALLET, hsd: HSD ) -> Dict [ str, Any ]:
+    """Fetch wallet and node information for notification."""
+    info = { }
 
-## REVEAL all names in the wallet if it is in reveal stage
+    # Current HNS block height using get_info
+    node_info = hsd.get_info ()
+    info [ "block_height" ] = node_info.get ( "chain", { } ).get ( "height",
+                                                                   "Unknown" ) if "error" not in node_info else "Error"
 
-def reveal_names_in_wallet():
-    names_in_wallet = wallet.getWalletNames()
-    reveal = []
-    for name in names_in_wallet:
-        if name['state'] == 'REVEAL':
-            wallet.sendREVEAL(passphrase, name['name'])
-            reveal.append(name['name'])
-    return reveal
+    # Current account using WALLET_ID from .env
+    info [ "account" ] = WALLET_ID
 
+    # HNS balance using get_balance with spendable balance calculation
+    balance_info = wallet.get_balance(id=WALLET_ID)
+    if "error" not in balance_info:
+        balance = balance_info
+        spendable_balance = (balance.get("unconfirmed", 0) - balance.get("lockedUnconfirmed", 0)) / 1_000_000
+        info["balance"] = spendable_balance
+    else:
+        info["balance"] = "Error"
 
-### Check if names in the wallet in BIDDING state
-def show_bidding_names_in_wallet():
-    names_in_wallet = wallet.getWalletNames()
-    bidding = []
-    for name in names_in_wallet:
-        if name['state'] == 'BIDDING':
-            bidding.append(name['name'])
-    return bidding
+    # Current receiving address using get_account_info["receiveAddress"]
+    account_info = wallet.get_account_info ( id=WALLET_ID )
+    info [ "receiving_address" ] = account_info.get ( "receiveAddress",
+                                                      "Error" ) if "error" not in account_info else "Error"
 
-
-## Renew names in the list based on specific expired days
-def renew_names_in_list(days):
-    names_to_be_renews = expire_in_days(days)
-    renew = []
-    for name in names_to_be_renews:
-        wallet.sendRENEW(passphrase, name)
-        renew.append(name)
-    return renew
+    return info
 
 
-## Bid at specific block
-def bid_at_block(block, name, bid_value, lockup_value):
-    block_height = node.block_height()
-    if block_height == block:
-        wallet.sendBID(passphrase, name, todollarydoo(bid_value), todollarydoo(lockup_value))
-    return
+def main ():
+    """Main function to manage wallet names and renewals with periodic execution."""
+    wallet, hsd = WALLET (), HSD ()
+    check_and_create_wallet ( wallet )  # Run once at startup
+
+    while True:
+        try:
+            fetch_and_save_names ( wallet )
+            renewed_names = renew_names ( wallet )
+            info = get_wallet_and_node_info ( wallet, hsd )
+
+            message_lines = [ f"Teleshake bot Update ({datetime.now ().strftime ( '%Y-%m-%d %H:%M:%S' )})" ]
+
+            # Wallet and node info (moved above renewal results)
+            message_lines.append ( "\n**Wallet/Node Information:**" )
+            message_lines.append ( f"Current HNS Block Height: {info [ 'block_height' ]}" )
+            message_lines.append ( f"Current Account: {info [ 'account' ]}" )
+            message_lines.append ( f"HNS Spendable Balance: {info [ 'balance' ]} HNS" )
+            message_lines.append ( f"Receiving Address: {info [ 'receiving_address' ]}" )
+
+            # Renewal results
+            message_lines.append ( "\n**Renewal Results:**" )
+            if renewed_names:
+                message_lines.append ( "Renewed the following names:" )
+                message_lines.extend ( [ f"- {name}" for name in renewed_names ] )
+            else:
+                message_lines.append ( "No names required renewal" )
+
+            message = "\n".join ( message_lines )
+            send_telegram_message ( message )
+            print(f"Notification sent. Sleeping for {LOOP_PERIOD_SECONDS} seconds...")
+
+        except Exception as e:
+            print ( f"Error in loop: {e}" )
+            send_telegram_message ( f"Error in Handshake Wallet Update: {e}" )
+
+        time.sleep ( LOOP_PERIOD_SECONDS )
 
 
-##### END CUSTOM WALLET FUNCTION #####
-
-### Send telegram message
-##### chat_id = telegram.get_chat_id()
-reveal = reveal_names_in_wallet()
-if reveal != []:
-    telegram.send_message("REVEALING:\n {}".format(reveal), chat_id)
-
-bidding = show_bidding_names_in_wallet()
-if bidding != []:
-    telegram.send_message("BIDDING:\n {}".format(bidding), chat_id)
-
-#### Export name and expired day to a json file
-names_until_expire()
-
-#### find name expire in No. of days (for example 100)
-days = 100
-y = expire_in_days(days)
-if y != []:
-    telegram.send_message("Handshake name will be expired in {} days:".format(days) + "\n" "{}".format(y) + "\n",
-                          chat_id)
-
-z = renew_names_in_list(days)
-if z != []:
-    telegram.send_message("Renewed names {}:".format(z) + "\n", chat_id)
-else:
-    telegram.send_message("There are no names to renew on the Handshake block {}".format(block_height) + "\n", chat_id)
+if __name__ == "__main__":
+    main ()

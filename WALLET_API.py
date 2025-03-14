@@ -15,6 +15,9 @@ class WALLET:
     WALLET_API = os.getenv('WALLET_API', '')
     WALLET_ADDRESS = os.getenv('WALLET_ADDRESS', '127.0.0.1')
     WALLET_PORT = os.getenv('WALLET_PORT', '12039')
+    WALLET_ID = os.getenv('WALLET_ID', 'primary')
+    WALLET_PASSPHRASE = os.getenv('WALLET_PASSPHRASE', '')
+    WALLET_MNEMONIC = os.getenv('WALLET_MNEMONIC', '')
 
     def __init__(self, api_key: str = None, ip_address: str = None, port: int = None):
         """
@@ -79,6 +82,14 @@ class WALLET:
                       type: str = 'pubkeyhash', mnemonic: str = '', master: str = '',
                       watch_only: bool = True, m: int = 1, n: int = 1) -> Dict[str, Any]:
         """Create a new wallet with specified parameters."""
+        # Use .env values if parameters are not provided
+        id = id if id is not None else self.WALLET_ID
+        passphrase = passphrase if passphrase is not None else self.WALLET_PASSPHRASE
+        mnemonic = mnemonic if mnemonic is not None else self.WALLET_MNEMONIC
+
+        if not passphrase:
+            raise ValueError("Passphrase must be provided either through parameter or .env file")
+
         endpoint = f'/wallet/{id}'
         payload = {
             "passphrase": passphrase,
@@ -393,8 +404,8 @@ class WALLET:
         endpoint = f'/wallet/{id}/nonce/{name}?address={address}&bid={bid}'
         return self.get ( endpoint )
 
-    def send_open ( self, id: str, passphrase: str, name: str, sign: bool = True,
-                    broadcast: bool = True ) -> Dict [ str, Any ]:
+    def send_open ( self, id: str = '', passphrase: str = '', name: str = '',
+                    sign: bool = True, broadcast: bool = True ) -> Dict [ str, Any ]:
         """Create, sign, and send a name OPEN."""
         endpoint = f'/wallet/{id}/open'
         payload = {
@@ -1039,24 +1050,10 @@ class WALLET:
 if __name__ == "__main__":
     # Example usage
     try:
-        wallet = Wallet ()
-
-        # Test getting auction info by name
-        auction_info = wallet.get_wallet_auction_by_name ( "example" )
-        print ( "Auction Info:", json.dumps ( auction_info, indent=2 ) )
-
-        # Test sending an OPEN transaction
-        open_tx = wallet.send_open (
-            id="primary",
-            passphrase="securepassword123",
-            name="example",
-            broadcast=True,
-            sign=True
-        )
-        print ( "Open Transaction:", json.dumps ( open_tx, indent=2 ) )
+        wallet = WALLET ()
 
         # Test RPC get wallet info
-        wallet_info = wallet.rpc_get_wallet_info ()
+        wallet_info = wallet.get_wallet_info ()
         print ( "RPC Wallet Info:", json.dumps ( wallet_info, indent=2 ) )
 
     except ValueError as e:
