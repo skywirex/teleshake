@@ -155,14 +155,13 @@ def main ():
             message_lines = [ f"Teleshake bot Update ({datetime.now ().strftime ( '%Y-%m-%d %H:%M:%S' )})" ]
 
             # Wallet and node info (moved above renewal results)
-            message_lines.append ( "\n**Wallet/Node Information:**" )
-            message_lines.append ( f"Current HNS Block Height: {info [ 'block_height' ]}" )
-            message_lines.append ( f"Current Account: {info [ 'account' ]}" )
-            message_lines.append ( f"HNS Spendable Balance: {info [ 'balance' ]} HNS" )
-            message_lines.append ( f"Receiving Address: {info [ 'receiving_address' ]}" )
+            message_lines.append ( "\nNODE/WALLET INFO:" )
+            message_lines.append ( f"Block Height: {info [ 'block_height' ]} | Account: {info [ 'account' ]}" )
+            message_lines.append ( f"Balance: {info [ 'balance' ]} HNS" )
+            message_lines.append ( f"Address: {info [ 'receiving_address' ]}" )
 
             # Renewal results
-            message_lines.append ( "\n**Renewal Results:**" )
+            message_lines.append ( "\nRENEWAL:" )
             if renewed_names:
                 message_lines.append ( "Renewed the following names:" )
                 message_lines.extend ( [ f"- {name}" for name in renewed_names ] )
