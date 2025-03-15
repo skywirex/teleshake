@@ -4,8 +4,8 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, Any
 from dotenv import load_dotenv
-from HSD_API import HSD
-from WALLET_API import WALLET
+from api.hsd import HSD
+from api.wallet import WALLET
 from bot import send_telegram_message  # Import from bot.py
 
 # Load environment variables
