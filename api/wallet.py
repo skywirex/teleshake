@@ -7,18 +7,8 @@ import os
 # Load environment variables
 load_dotenv()
 
-
 class WALLET:
     """A class to interact with the Handshake wallet API."""
-
-    # Class variables from environment with defaults
-    WALLET_API = os.getenv('WALLET_API', '')
-    WALLET_ADDRESS = os.getenv('WALLET_ADDRESS', '127.0.0.1')
-    WALLET_PORT = os.getenv('WALLET_PORT', '12039')
-    WALLET_ID = os.getenv('WALLET_ID', 'primary')
-    WALLET_PASSPHRASE = os.getenv('WALLET_PASSPHRASE', '')
-    WALLET_MNEMONIC = os.getenv('WALLET_MNEMONIC', '')
-
     def __init__(self, api_key: str = None, ip_address: str = None, port: int = None):
         """
         Initialize the Wallet class.
@@ -31,12 +21,11 @@ class WALLET:
         Raises:
             ValueError: If no API key is provided through parameter or environment
         """
-        self.api_key = api_key if api_key is not None else self.WALLET_API
-        self.address = ip_address if ip_address is not None else self.WALLET_ADDRESS
-        self.port = str(port if port is not None else self.WALLET_PORT)
-
-        if not self.api_key:
-            raise ValueError("API key must be provided either through parameter or .env file")
+        # Class variables from environment with defaults
+        load_dotenv()
+        self.api_key = api_key or os.getenv("WALLET_API","")
+        self.address = ip_address or os.getenv("WALLET_ADDRESS", "127.0.0.1")
+        self.port = port if port is not None else int(os.getenv("WALLET_PORT", "12039"))
 
         self.base_url = f'http://x:{self.api_key}@{self.address}:{self.port}'
 
@@ -78,18 +67,10 @@ class WALLET:
         return self._make_request('delete', endpoint, message)
 
     # Wallet Management Methods
-    def create_wallet(self, passphrase: str, id: str = 'primary', account_key: str = '',
-                      type: str = 'pubkeyhash', mnemonic: str = '', master: str = '',
-                      watch_only: bool = True, m: int = 1, n: int = 1) -> Dict[str, Any]:
+    def create_wallet( self, passphrase: str, id: str = 'primary', account_key: str = '',
+                       type: str = 'pubkeyhash', mnemonic: str = '', master: str = '',
+                       watch_only: bool = True, m: int = 1, n: int = 1 ) -> Dict[str, Any]:
         """Create a new wallet with specified parameters."""
-        # Use .env values if parameters are not provided
-        id = id if id is not None else self.WALLET_ID
-        passphrase = passphrase if passphrase is not None else self.WALLET_PASSPHRASE
-        mnemonic = mnemonic if mnemonic is not None else self.WALLET_MNEMONIC
-
-        if not passphrase:
-            raise ValueError("Passphrase must be provided either through parameter or .env file")
-
         endpoint = f'/wallet/{id}'
         payload = {
             "passphrase": passphrase,
@@ -102,6 +83,12 @@ class WALLET:
             "mnemonic": mnemonic
         }
         return self.put(endpoint, json.dumps(payload))
+
+    def rescan ( self, height: int ) -> Dict [ str, Any ]:
+        """Rescan the blockchain from a specific height."""
+        endpoint = f'/rescan'
+        payload = { "height": height }
+        return self.post ( endpoint, json.dumps ( payload ) )
 
     def reset_auth_token(self, passphrase: str, id: str = 'primary') -> Dict[str, Any]:
         """Reset the authentication token for a wallet."""
