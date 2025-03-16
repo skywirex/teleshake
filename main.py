@@ -140,40 +140,80 @@ def get_wallet_and_node_info ( wallet: WALLET, hsd: HSD ) -> Dict [ str, Any ]:
     return info
 
 
-def main ():
+def find_soonest_expiring_name() -> Dict[str, Any]:
+    """Find the name with the soonest expiration date from wallet_names.json."""
+    if not os.path.exists(NAMES_JSON_FILE):
+        raise FileNotFoundError(f"{NAMES_JSON_FILE} not found. Run fetch_and_save_names first.")
+
+    with open(NAMES_JSON_FILE, 'r') as f:
+        names_data = json.load(f)
+
+    if not names_data:
+        return {"name": None, "expiration_date": None, "message": "No names found in wallet_names.json"}
+
+    # Find the domain name with the earliest expiration date.
+    soonest_name = None
+    soonest_date = None
+
+    for name, data in names_data.items():
+        expiration_date = datetime.fromisoformat(data["expiration_date"])
+        if soonest_date is None or expiration_date < soonest_date:
+            soonest_name = name
+            soonest_date = expiration_date
+
+    return {
+        "name": soonest_name,
+        "expiration_date": soonest_date.isoformat(),
+        "days_until_expire": (soonest_date - datetime.now()).days
+    }
+
+
+def main():
     """Main function to manage wallet names and renewals with periodic execution."""
-    wallet, hsd = WALLET (), HSD ()
-    check_and_create_wallet ( wallet )  # Run once at startup
+    wallet, hsd = WALLET(), HSD()
+    check_and_create_wallet(wallet)  # Run once at startup
 
     while True:
         try:
-            fetch_and_save_names ( wallet )
-            renewed_names = renew_names ( wallet )
-            info = get_wallet_and_node_info ( wallet, hsd )
+            fetch_and_save_names(wallet)
+            renewed_names = renew_names(wallet)
+            info = get_wallet_and_node_info(wallet, hsd)
 
-            message_lines = [ f"Teleshake Update ({datetime.now ().strftime ( '%Y-%m-%d %H:%M:%S' )})" ]
+            # Find the domain name expiring soonest
+            soonest_expiring = find_soonest_expiring_name()
 
-            # Wallet and node info (moved above renewal results)
-            message_lines.append ( "\nINFO:" )
-            message_lines.append ( f"Block Height: {info [ 'block_height' ]} | Account: {info [ 'account' ]}" )
-            message_lines.append ( f"Balance: {info [ 'balance' ]} HNS" )
-            message_lines.append ( f"Address: {info [ 'receiving_address' ]}" )
+            message_lines = [f"Teleshake Update ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})"]
+
+            # Wallet và node info
+            message_lines.append("\nINFO:")
+            message_lines.append(f"Block Height: {info['block_height']} | Account: {info['account']}")
+            message_lines.append(f"Balance: {info['balance']} HNS")
+            message_lines.append(f"Address: {info['receiving_address']}")
+
+            # Information on soonest expired domain names
+            message_lines.append("\nSOONEST EXPIRING NAME:")
+            if soonest_expiring["name"]:
+                message_lines.append(f"Name: {soonest_expiring['name']}")
+                message_lines.append(f"Expires: {soonest_expiring['expiration_date']}")
+                message_lines.append(f"Days until expiration: {soonest_expiring['days_until_expire']}")
+            else:
+                message_lines.append("No names found")
 
             # Renewal results
-            message_lines.append ( "\nRENEWAL:" )
+            message_lines.append("\nRENEWAL:")
             if renewed_names:
-                message_lines.append ( "Renewed the following names:" )
-                message_lines.extend ( [ f"- {name}" for name in renewed_names ] )
+                message_lines.append("Renewed the following names:")
+                message_lines.extend([f"- {name}" for name in renewed_names])
             else:
-                message_lines.append ( "No names required renewal" )
+                message_lines.append("No names required renewal")
 
-            message = "\n".join ( message_lines )
-            send_telegram_message ( message )
+            message = "\n".join(message_lines)
+            send_telegram_message(message)
             print(f"Notification sent. Sleeping for {LOOP_PERIOD_SECONDS} seconds...")
 
         except Exception as e:
-            print ( f"Error in loop: {e}" )
-            send_telegram_message ( f"Error in Handshake Wallet Update: {e}" )
+            print(f"Error in loop: {e}")
+            send_telegram_message(f"Error in Handshake Wallet Update: {e}")
 
         time.sleep ( LOOP_PERIOD_SECONDS )
 
