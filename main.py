@@ -189,7 +189,7 @@ def main():
 
                     # Wallet and node info
                     message_lines.append("\nINFO:")
-                    message_lines.append(f"Block Height: {info['block_height']} | Account: {info['account']}")
+                    message_lines.append(f"Account: {info['account']} | Height: {info['block_height']}")
                     message_lines.append(f"Balance: {info['balance']} HNS")
                     message_lines.append(f"Address: {info['receiving_address']}")
 
