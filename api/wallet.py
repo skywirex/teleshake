@@ -1,33 +1,101 @@
-import requests
 import json
-from typing import Optional, List, Dict, Any
-from dotenv import load_dotenv
+import logging
 import os
+from typing import Dict, Optional, List, Any
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
-# Load environment variables
-load_dotenv()
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Load configuration from config.json
+CONFIG_FILE = 'config.json'
+if not os.path.exists(CONFIG_FILE):
+    logger.error(f"Configuration file {CONFIG_FILE} not found")
+    raise FileNotFoundError(f"Configuration file {CONFIG_FILE} not found")
+
+with open(CONFIG_FILE, 'r') as f:
+    config = json.load(f)
 
 class WALLET:
-    """A class to interact with the Handshake wallet API."""
-    def __init__(self, api_key: str = None, ip_address: str = None, port: int = None):
+    """A client for interacting with the Handshake wallet API."""
+
+    def __init__(self, api_key: Optional[str] = None, ip_address: Optional[str] = None, port: Optional[int] = None):
         """
-        Initialize the Wallet class.
+        Initialize the Wallet client with optional parameters, falling back to config.json values.
 
         Args:
-            api_key (str, optional): Wallet API key. Defaults to WALLET_API from .env
-            ip_address (str, optional): Wallet node IP. Defaults to WALLET_ADDRESS from .env
-            port (int, optional): Wallet node port. Defaults to WALLET_PORT from .env
+            api_key (str, optional): Wallet API key. Defaults to WALLET_API from config.json.
+            ip_address (str, optional): Wallet node IP address. Defaults to WALLET_ADDRESS from config.json.
+            port (int, optional): Wallet node port. Defaults to WALLET_PORT from config.json.
 
         Raises:
-            ValueError: If no API key is provided through parameter or environment
+            ValueError: If required configuration (api_key) is missing.
         """
-        # Class variables from environment with defaults
-        load_dotenv()
-        self.api_key = api_key or os.getenv("WALLET_API","")
-        self.address = ip_address or os.getenv("WALLET_ADDRESS", "127.0.0.1")
-        self.port = port if port is not None else int(os.getenv("WALLET_PORT", "12039"))
+        self.api_key = api_key or config.get('WALLET_API')
+        self.address = ip_address or config.get('WALLET_ADDRESS', '127.0.0.1')
+        self.port = port if port is not None else config.get('WALLET_PORT', 12039)
+
+        if not self.api_key:
+            logger.error("WALLET_API key is required but not found in config.json or provided as argument")
+            raise ValueError("WALLET_API key is required. Set it in config.json or pass it as an argument.")
 
         self.base_url = f'http://x:{self.api_key}@{self.address}:{self.port}'
+
+        # Configure requests session with retries and timeouts
+        self.session = requests.Session()
+        retries = Retry(total=3, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
+        adapter = HTTPAdapter(max_retries=retries)
+        self.session.mount('http://', adapter)
+
+        logger.debug(f"Initialized WALLET client with base URL: {self.base_url}")
+
+    def __enter__(self):
+        """Support context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Close the session when exiting context."""
+        self.session.close()
+        logger.debug("WALLET session closed")
+
+    def get_wallet_info(self, wallet_id: str) -> Dict[str, Any]:
+        """
+        Fetch information about a specific wallet.
+
+        Args:
+            wallet_id (str): The ID of the wallet to query.
+
+        Returns:
+            Dict[str, Any]: Wallet information (e.g., ID, balance).
+
+        Raises:
+            requests.RequestException: If the API call fails after retries.
+        """
+        url = f"{self.base_url}/wallets/{wallet_id}"
+        try:
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            logger.info(f"Successfully fetched wallet info for {wallet_id}")
+            return data
+        except requests.RequestException as e:
+            logger.error(f"Failed to fetch wallet info for {wallet_id}: {str(e)}")
+            raise
+
+    def __enter__(self):
+        """Support context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Close the session when exiting context."""
+        self.session.close()
+        logger.debug("WALLET session closed")
 
     def _make_request(self, method: str, endpoint: str, data: str = '') -> Dict[str, Any]:
         """

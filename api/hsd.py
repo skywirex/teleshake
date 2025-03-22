@@ -1,11 +1,10 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-import requests
-from typing import Dict, Union, Optional, List
 import json
 import logging
 import os
-from dotenv import load_dotenv
+from typing import Dict, Union, Optional, List
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # Configure logging
 logging.basicConfig(
@@ -14,34 +13,56 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Load configuration from config.json
+CONFIG_FILE = 'config.json'
+if not os.path.exists(CONFIG_FILE):
+    logger.error(f"Configuration file {CONFIG_FILE} not found")
+    raise FileNotFoundError(f"Configuration file {CONFIG_FILE} not found")
+
+with open(CONFIG_FILE, 'r') as f:
+    config = json.load(f)
+
 
 class HSD:
     """A client for interacting with the Handshake (HSD) node REST and RPC API."""
 
     def __init__(self, api_key: Optional[str] = None, host: Optional[str] = None, port: Optional[int] = None):
         """
-        Initialize the HSD client with optional parameters, falling back to .env values.
+        Initialize the HSD client with optional parameters, falling back to config.json values.
 
         Args:
-            api_key (str, optional): HSD API key. Defaults to NODE_API_KEY from .env.
-            host (str, optional): HSD node host address. Defaults to NODE_HOST from .env.
-            port (int, optional): HSD node port. Defaults to NODE_PORT from .env.
+            api_key (str, optional): HSD API key. Defaults to NODE_API_KEY from config.json values.
+            host (str, optional): HSD node host address. Defaults to NODE_HOST from config.json values.
+            port (int, optional): HSD node port. Defaults to NODE_PORT from config.json values.
 
         Raises:
             ValueError: If required configuration (api_key) is missing.
         """
-        load_dotenv()
-        self.api_key = api_key or os.getenv("NODE_API_KEY")
-        self.host = host or os.getenv("NODE_HOST", "127.0.0.1")
-        self.port = port if port is not None else int(os.getenv("NODE_PORT", "12037"))
+        self.api_key = api_key or config.get('NODE_API_KEY')
+        self.host = host or config.get('NODE_HOST', '127.0.0.1')
+        self.port = port if port is not None else config.get('NODE_PORT', 12037)
 
         if not self.api_key:
-            logger.error("NODE_API_KEY is required but not found in .env or provided as argument")
-            raise ValueError("NODE_API_KEY is required. Set it in .env or pass it as an argument.")
+            logger.error("NODE_API_KEY is required but not found in config.json or provided as argument")
+            raise ValueError("NODE_API_KEY is required. Set it in config.json or pass it as an argument.")
 
         self.base_url = f'http://x:{self.api_key}@{self.host}:{self.port}'
+
+        # Configure requests session with retries and timeouts
         self.session = requests.Session()
+        retries = Retry(total=3, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
+        adapter = HTTPAdapter(max_retries=retries)
+        self.session.mount('http://', adapter)
         logger.debug(f"Initialized HSD client with base URL: {self.base_url}")
+
+    def __enter__(self):
+        """Support context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Close the session when exiting context."""
+        self.session.close()
+        logger.debug("HSD session closed")
 
     def _request(self, method: str, endpoint: str, data: Optional[str] = None) -> Dict[str, Union[str, dict]]:
         """Handle HTTP requests with improved error handling."""
@@ -427,13 +448,10 @@ class HSD:
 
 
 if __name__ == "__main__":
+    # Test the HSD client
     try:
         hsd = HSD()
         info = hsd.get_info()
-        logger.info(f"Server info: {info}")
-        blockchain_info = hsd.rpc_get_blockchain_info()
-        logger.info(f"Blockchain info: {blockchain_info}")
-    except ValueError as e:
-        logger.error(f"Configuration error: {e}")
+        logger.info(f"HSD Node Info: {info}")
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
+        logger.error(f"Test failed: {str(e)}")
