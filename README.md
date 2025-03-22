@@ -180,13 +180,15 @@ sudo systemctl stop handshake-bot
 ### Project Structure
 
 ```
-project/
-│
-├── HSD_API.py         # Handshake node API client
-├── WALLET_API.py      # Handshake wallet API client
+teleshake/
+├── Dockerfile         # Updated to use config.json
+├── main.py            # Updated to load config from JSON
+├── api/
+│   ├── __init__.py    # Empty file to mark 'api' as a package
+│   ├── HSD_API.py     # Handshake node API client
+│   └── WALLET_API.py  # Handshake wallet API client 
 ├── bot.py             # Telegram bot functionality
-├── main.py            # Main script
-├── .env               # Environment variables
+├── config.json        # New JSON config file (replaces .env)
 ├── requirements.txt   # Python dependencies
 └── wallet_names.json  # Generated JSON file
 ```
