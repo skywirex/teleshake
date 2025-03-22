@@ -1,1 +1,16 @@
 
+{
+  "WALLET_API": "your_wallet_api_key",
+  "WALLET_ADDRESS": "127.0.0.1",
+  "WALLET_PORT": 12039,
+  "WALLET_ID": "primary",
+  "WALLET_PASSPHRASE": "your_secure_passphrase",
+  "WALLET_MNEMONIC": "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor add",
+  "NODE_API_KEY": "your_node_api_key",
+  "NODE_HOST": "127.0.0.1",
+  "NODE_PORT": 12037,
+  "RENEWAL_THRESHOLD_DAYS": 30,
+  "TELEGRAM_BOT_TOKEN": "your_bot_token",
+  "TELEGRAM_CHAT_ID": "your_chat_id",
+  "LOOP_PERIOD_SECONDS": 3600
+}
