@@ -1,235 +1,71 @@
-import json
-import os
 import time
-from datetime import datetime, timedelta
-from typing import Dict, Any
-from dotenv import load_dotenv
-from api.hsd import HSD
-from api.wallet import WALLET
-from bot import send_telegram_message  # Import from bot.py
-
-# Load environment variables
-load_dotenv ()
-
-# Renewal configuration from .env
-RENEWAL_THRESHOLD_DAYS = int ( os.getenv ( 'RENEWAL_THRESHOLD_DAYS', 30 ) )
-LOOP_PERIOD_SECONDS = int(os.getenv('LOOP_PERIOD_SECONDS', 3600))  # Default to 1 hour (3600 seconds)
-
-# Wallet configuration from .env
-WALLET_ID = os.getenv ( 'WALLET_ID', 'primary' )
-WALLET_PASSPHRASE = os.getenv ( 'WALLET_PASSPHRASE', '' )
-WALLET_MNEMONIC = os.getenv ( 'WALLET_MNEMONIC', '' )
-
-# JSON file to store name data
-NAMES_JSON_FILE = 'wallet_names.json'
-
-
-def check_and_create_wallet ( wallet: WALLET ) -> None:
-    """Check if wallet exists, create it if it doesn't."""
-    response = wallet.get_wallet_info ( WALLET_ID )
-    if "error" in response:
-        print ( f"Wallet '{WALLET_ID}' does not exist or is inaccessible. Creating it..." )
-        create_response = wallet.create_wallet (
-            passphrase=WALLET_PASSPHRASE,
-            id=WALLET_ID,
-            mnemonic=WALLET_MNEMONIC
-        )
-        if "error" in create_response:
-            raise RuntimeError ( f"Failed to create wallet: {create_response [ 'error' ]}" )
-        print ( f"Wallet '{WALLET_ID}' created successfully" )
-    else:
-        print ( f"Wallet '{WALLET_ID}' already exists" )
-
-
-def get_expiration_date ( name_info: Dict [ str, Any ] ) -> datetime:
-    """Extract expiration date from name info using daysUntilExpire."""
-    stats = name_info.get ( "stats", { } )
-    days_until_expire = stats.get ( "daysUntilExpire", None )
-
-    if days_until_expire is None:
-        # Fallback if daysUntilExpire is missing
-        print ( f"Warning: No daysUntilExpire for '{name_info [ 'name' ]}'; assuming distant future expiration" )
-        return datetime.now () + timedelta ( days=365 * 2 )  # Default to 2 years
-
-    expiration_date = datetime.now () + timedelta ( days=days_until_expire )
-    return expiration_date
-
-
-def fetch_and_save_names ( wallet: WALLET ) -> None:
-    """Fetch owned names and save to JSON file."""
-    response = wallet.get_wallet_names_own ( WALLET_ID )
-    if "error" in response:
-        raise RuntimeError ( f"Failed to fetch wallet names: {response [ 'error' ]}" )
-
-    names_data = { }
-    for name_info in response:
-        name = name_info [ "name" ]
-        try:
-            expiration_date = get_expiration_date ( name_info )
-            renewal_height = name_info.get ( "renewal", 0 )
-            names_data [ name ] = {
-                "expiration_date": expiration_date.isoformat (),
-                "days_until_expire": name_info.get ( "stats", { } ).get ( "daysUntilExpire", None )
-            }
-        except Exception as e:
-            print ( f"Error processing name '{name}': {str ( e )}" )
-
-    with open ( NAMES_JSON_FILE, 'w' ) as f:
-        json.dump ( names_data, f, indent=4 )
-    print ( f"Names data saved to {NAMES_JSON_FILE}" )
-
-
-def renew_names ( wallet: WALLET ) -> list:
-    """Read names from JSON, renew if expiring soon using send_renew, and return renewed names."""
-    if not os.path.exists ( NAMES_JSON_FILE ):
-        raise FileNotFoundError ( f"{NAMES_JSON_FILE} not found. Run fetch_and_save_names first." )
-
-    with open ( NAMES_JSON_FILE, 'r' ) as f:
-        names_data = json.load ( f )
-
-    current_date = datetime.now ()
-    threshold_date = current_date + timedelta ( days=RENEWAL_THRESHOLD_DAYS )
-    renewed_names = [ ]
-
-    for name, data in names_data.items ():
-        expiration_date = datetime.fromisoformat ( data [ "expiration_date" ] )
-        if expiration_date <= threshold_date:
-            print ( f"Renewing name '{name}' expiring on {expiration_date}" )
-            response = wallet.send_renew (
-                id=WALLET_ID,
-                passphrase=WALLET_PASSPHRASE,
-                name=name,
-                sign=True,
-                broadcast=True
-            )
-            if "error" in response:
-                print ( f"Failed to renew '{name}': {response [ 'error' ]}" )
-            else:
-                renewed_names.append ( name )
-                print ( f"Successfully renewed '{name}'" )
-
-    return renewed_names
-
-
-def get_wallet_and_node_info ( wallet: WALLET, hsd: HSD ) -> Dict [ str, Any ]:
-    """Fetch wallet and node information for notification."""
-    info = { }
-
-    # Current HNS block height using get_info
-    node_info = hsd.get_info ()
-    info [ "block_height" ] = node_info.get ( "chain", { } ).get ( "height",
-                                                                   "Unknown" ) if "error" not in node_info else "Error"
-
-    # Current account using WALLET_ID from .env
-    info [ "account" ] = WALLET_ID
-
-    # HNS balance using get_balance with spendable balance calculation
-    balance_info = wallet.get_balance(id=WALLET_ID)
-    if "error" not in balance_info:
-        balance = balance_info
-        spendable_balance = (balance.get("unconfirmed", 0) - balance.get("lockedUnconfirmed", 0)) / 1_000_000
-        info["balance"] = spendable_balance
-    else:
-        info["balance"] = "Error"
-
-    # Current receiving address using get_account_info["receiveAddress"]
-    account_info = wallet.get_account_info ( id=WALLET_ID )
-    info [ "receiving_address" ] = account_info.get ( "receiveAddress",
-                                                      "Error" ) if "error" not in account_info else "Error"
-
-    return info
-
-
-def find_soonest_expiring_name() -> Dict[str, Any]:
-    """Find the name with the soonest expiration date from wallet_names.json."""
-    if not os.path.exists(NAMES_JSON_FILE):
-        raise FileNotFoundError(f"{NAMES_JSON_FILE} not found. Run fetch_and_save_names first.")
-
-    with open(NAMES_JSON_FILE, 'r') as f:
-        names_data = json.load(f)
-
-    if not names_data:
-        return {"name": None, "expiration_date": None, "message": "No names found in wallet_names.json"}
-
-    # Find the domain name with the earliest expiration date.
-    soonest_name = None
-    soonest_date = None
-
-    for name, data in names_data.items():
-        expiration_date = datetime.fromisoformat(data["expiration_date"])
-        if soonest_date is None or expiration_date < soonest_date:
-            soonest_name = name
-            soonest_date = expiration_date
-
-    return {
-        "name": soonest_name,
-        "expiration_date": soonest_date.isoformat(),
-        "days_until_expire": (soonest_date - datetime.now()).days
-    }
-
+from datetime import datetime
+from utils import (
+    WALLET, HSD, check_and_create_wallet, fetch_and_save_names, renew_names,
+    get_wallet_and_node_info, find_soonest_expiring_name, LOOP_PERIOD_SECONDS
+)
+from bot import send_telegram_message
 
 def main():
     """Main function to manage wallet names and renewals with periodic execution."""
-    while True:  # Infinite loop to restart on critical errors
+    while True:  # Outer loop for critical restarts
         try:
             wallet, hsd = WALLET(), HSD()
             check_and_create_wallet(wallet)  # Run once at startup
 
-            # Main program logic
-            while True:
+            while True:  # Inner loop for regular execution
                 try:
                     fetch_and_save_names(wallet)
                     renewed_names = renew_names(wallet)
                     info = get_wallet_and_node_info(wallet, hsd)
-
-                    # Find the domain name expiring soonest
                     soonest_expiring = find_soonest_expiring_name()
 
-                    message_lines = [f"Teleshake Update ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})"]
-
+                    # Construct formatted message with HTML
+                    message_lines = [
+                        f"<b>Teleshake Update ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})</b>"
+                    ]
                     # Wallet and node info
-                    message_lines.append("\nINFO:")
-                    message_lines.append(f"Account: {info['account']} | Height: {info['block_height']}")
-                    message_lines.append(f"Balance: {info['balance']} HNS")
-                    message_lines.append(f"Address: {info['receiving_address']}")
+                    message_lines.append("\n<b>INFO:</b>")
+                    message_lines.append(f"Account: <code>{info['account']}</code> | Height: <code>{info['block_height']}</code>")
+                    message_lines.append(f"Balance: <code>{info['balance']} HNS</code>")
+                    message_lines.append(f"Address: <code>{info['full_receiving_address']}</code>")
 
-                    # Information about the soonest expiring domain name
-                    message_lines.append("\nSOONEST EXPIRING NAME:")
+                    # Soonest expiring name
+                    message_lines.append("\n<b>SOONEST EXPIRING NAME:</b>")
                     if soonest_expiring["name"]:
-                        message_lines.append(f"Name: {soonest_expiring['name']}")
-                        message_lines.append(f"Expires: {soonest_expiring['expiration_date']}")
-                        message_lines.append(f"Days until expiration: {soonest_expiring['days_until_expire']}")
+                        message_lines.append(f"Name: <code>{soonest_expiring['name']}</code>")
+                        message_lines.append(f"Expires: <code>{soonest_expiring['expiration_date']}</code>")
+                        message_lines.append(f"Days until expiration: <code>{soonest_expiring['days_until_expire']}</code>")
                     else:
                         message_lines.append("No names found")
 
                     # Renewal results
-                    message_lines.append("\nRENEWAL:")
+                    message_lines.append("\n<b>RENEWAL:</b>")
                     if renewed_names:
                         message_lines.append("Renewed the following names:")
-                        message_lines.extend([f"- {name}" for name in renewed_names])
+                        message_lines.extend([f"- <code>{name}</code>" for name in renewed_names])
                     else:
                         message_lines.append("No names required renewal")
 
                     message = "\n".join(message_lines)
-                    send_telegram_message(message)
+                    send_telegram_message(message, parse_mode="HTML")
                     print(f"Notification sent. Sleeping for {LOOP_PERIOD_SECONDS} seconds...")
 
                 except Exception as e:
-                    error_message = f"Error in inner loop: {str(e)}"
-                    print(error_message)
-                    send_telegram_message(error_message)
+                    error_message = f"<b>Error in Teleshake:</b> {str(e)}"
+                    print(f"Inner loop error: {str(e)}")
+                    send_telegram_message(error_message, parse_mode="HTML")
 
-                time.sleep(LOOP_PERIOD_SECONDS)  # Wait LOOP_PERIOD_SECONDS after each run
+                time.sleep(LOOP_PERIOD_SECONDS)
 
         except Exception as outer_e:
-            error_message = f"Critical error in main loop, restarting in {LOOP_PERIOD_SECONDS} seconds: {str(outer_e)}"
-            print(error_message)
+            error_message = f"<b>Critical Error in Teleshake, restarting in {LOOP_PERIOD_SECONDS}s:</b> {str(outer_e)}"
+            print(f"Critical error: {str(outer_e)}")
             try:
-                send_telegram_message(error_message)
+                send_telegram_message(error_message, parse_mode="HTML")
             except Exception as telegram_error:
-                print(f"Failed to send Telegram message: {telegram_error}")
-            time.sleep(LOOP_PERIOD_SECONDS)  # Wait before restarting the entire program
-
+                print(f"Failed to send Telegram error message: {telegram_error}")
+            time.sleep(LOOP_PERIOD_SECONDS)
 
 if __name__ == "__main__":
-    main ()
+    main()
