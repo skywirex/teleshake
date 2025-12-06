@@ -522,15 +522,27 @@ class WALLET:
         }
         return self.post ( endpoint, json.dumps ( payload ) )
 
+    # def send_renew ( self, id: str, passphrase: str, name: str, sign: bool = True,
+    #                  broadcast: bool = True ) -> Dict [ str, Any ]:
+    #     """Create, sign, and send a RENEW."""
+    #     endpoint = f'/wallet/{id}/renewal'
+    #     payload = {
+    #         "passphrase": passphrase,
+    #         "name": name,
+    #         "broadcast": '1' if broadcast else '0',
+    #         "sign": '1' if sign else '0'
+    #     }
+    #     return self.post ( endpoint, json.dumps ( payload ) )
+
     def send_renew ( self, id: str, passphrase: str, name: str, sign: bool = True,
-                     broadcast: bool = True ) -> Dict [ str, Any ]:
+                     broadcast: bool = True    ) -> Dict [ str, Any ]:
         """Create, sign, and send a RENEW."""
         endpoint = f'/wallet/{id}/renewal'
         payload = {
             "passphrase": passphrase,
             "name": name,
-            "broadcast": '1' if broadcast else '0',
-            "sign": '1' if sign else '0'
+            "broadcast": 1 if broadcast else 0,  # better: send real bool/int
+            "sign": 1 if sign else 0
         }
         return self.post ( endpoint, json.dumps ( payload ) )
 
