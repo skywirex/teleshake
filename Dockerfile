@@ -13,7 +13,6 @@ ENV PATH="/app/venv/bin:$PATH"
 
 RUN pip install -r requirements.txt
 
-
 CMD  ["python", "./main.py"]
 
 # Healthcheck

@@ -46,4 +46,4 @@ def send_telegram_message(message: str, parse_mode: str = None) -> None:
 
 # Test call function
 if __name__ == "__main__":
-    send_telegram_message("Test message from bot.py", parse_mode="HTML")
+    send_telegram_message("Test message from bot_telegram.py", parse_mode="HTML")

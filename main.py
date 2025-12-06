@@ -4,14 +4,14 @@ from utils import (
     WALLET, HSD, check_and_create_wallet, fetch_and_save_names, renew_names,
     get_wallet_and_node_info, find_soonest_expiring_name, LOOP_PERIOD_SECONDS
 )
-from bot import send_telegram_message
+from bot_telegram import send_telegram_message
 
 def main():
     """Main function to manage wallet names and renewals with periodic execution."""
     while True:  # Outer loop for critical restarts
         try:
             wallet, hsd = WALLET(), HSD()
-            check_and_create_wallet(wallet)  # Run once at startup
+            ## check_and_create_wallet(wallet)  # Run once at startup
 
             while True:  # Inner loop for regular execution
                 try:
