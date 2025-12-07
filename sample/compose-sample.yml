@@ -1,0 +1,27 @@
+---
+services:
+  hsd:
+    image: handshakeorg/hsd:8.0.0
+    container_name: hsd
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - $HOME/.hsd:/root/.hsd
+    command: >
+      --network main
+      --spv
+      --http-host 0.0.0.0
+      --api-key=your_node_api_key
+      --wallet-http-host=0.0.0.0
+      --wallet-api-key=your_wallet_api_key
+
+  teleshake:
+    image: skywirex/teleshake:v0.3.3
+    container_name: teleshake
+    network_mode: host
+    depends_on:
+      - hsd
+    volumes:
+      - $HOME/docker/teleshake/config.json:/app/config.json
+    entrypoint: ["sh", "-c"]
+    command: ["sleep 3 && exec python ./main.py"]
