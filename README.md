@@ -59,7 +59,6 @@ NODE_PORT=12037
 RENEWAL_THRESHOLD_DAYS=30
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
-LOOP_PERIOD_SECONDS=3600  # 1 hour
 ```
 
 Replace placeholders (e.g., `your_wallet_api_key`) with actual values.
@@ -215,7 +214,6 @@ cat > $HOME/docker/teleshake/config.json << 'EOF'
   "RENEWAL_THRESHOLD_DAYS": 60,
   "TELEGRAM_BOT_TOKEN": "your_bot_token",
   "TELEGRAM_CHAT_ID": "your_chat_id",
-  "LOOP_PERIOD_SECONDS": 3600
 }
 EOF
 ```
@@ -229,24 +227,25 @@ docker run -d \
   -v $HOME/docker/teleshake/config.json:/app/config.json \
   skywirex/teleshake:latest
 ```
-
-
-
-
-
 ### Project Structure
 
 ```
 teleshake/
-├── Dockerfile         # Updated to include utils.py
-├── main.py            # Contains only main() with imports from utils
-├── utils.py           # New file with all helper functions
-├── api/
-│   ├── __init__.py    # Empty file to mark 'api' as a package
-│   ├── HSD_API.py     # Handshake node API client
-│   └── WALLET_API.py  # Handshake wallet API client 
-├── bot.py             # Telegram bot functionality
-├── config.json        # JSON config file
-├── requirements.txt   # Python dependencies
-└── wallet_names.json  # Generated JSON file
+├── api/                  # Handshake node & wallet API clients
+│   ├── HSD_API.py
+│   └── WALLET_API.py
+├── img/                  # Image-related assets (added at initial commit)
+├── sample/               # Sample configs/scripts (recently updated)
+└── supervisor/
+│   ├── supervisord.conf   # main config
+│   └── conf.d/
+│        └── teleshake.conf  # your program
+├── .gitignore            # Git ignore rules
+├── Dockerfile            # Docker setup (modified recently)
+├── LICENSE               # Apache-2.0 license
+├── README.md             # Documentation (Docker section added)
+├── bot_telegram.py       # Telegram bot integration
+├── main.py               # Entry point (runs a single cycle)
+├── requirements.txt      # Python dependencies
+└── utils.py              # Helper functions
 ```
