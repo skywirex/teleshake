@@ -16,7 +16,7 @@ services:
       --wallet-api-key=your_wallet_api_key
 
   teleshake:
-    image: skywirex/teleshake:v0.3.3
+    image: skywirex/teleshake:v0.4.0
     container_name: teleshake
     network_mode: host
     depends_on:

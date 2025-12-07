@@ -11,5 +11,4 @@
   "RENEWAL_THRESHOLD_DAYS": 60,
   "TELEGRAM_BOT_TOKEN": "your_bot_token",
   "TELEGRAM_CHAT_ID": "your_chat_id",
-  "LOOP_PERIOD_SECONDS": 3600
 }
