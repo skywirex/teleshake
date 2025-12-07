@@ -2,6 +2,8 @@ FROM python:3.13-alpine
 
 WORKDIR /app
 
+RUN apk add curl
+
 RUN python -m venv /app/venv
 
 # Enable venv
