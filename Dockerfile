@@ -1,37 +1,30 @@
 FROM python:3.13-alpine
 
-# OpenRC + tools
-RUN apk add --no-cache openrc tzdata && \
-    rm -rf /var/cache/apk/*
+# Only tzdata needed
+RUN apk add --no-cache tzdata
 
 ENV TZ=Asia/Ho_Chi_Minh
 WORKDIR /app
 
-# Virtual environment
+# Create virtualenv
 RUN python -m venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
 
-# Python dependencies
+# Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy app
 COPY . .
 
-# Copy service files
+# Copy and make script executable
 COPY scripts/teleshake.sh /app/scripts/teleshake.sh
-COPY init.d/teleshake     /etc/init.d/teleshake
-COPY entrypoint.sh        /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 
-# Make executable
-RUN chmod +x /app/scripts/teleshake.sh \
-             /etc/init.d/teleshake \
-             /entrypoint.sh
+RUN chmod +x /app/scripts/teleshake.sh /entrypoint.sh
 
-# OpenRC runtime dirs
-RUN mkdir -p /run/openrc && touch /run/openrc/softlevel
-
-# Default loop interval (can be overridden at runtime)
+# Default loop: 1 hour
 ENV LOOP_SECONDS=3600
 
+# Run our simple entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
