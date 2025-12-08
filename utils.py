@@ -18,8 +18,6 @@ RENEWAL_THRESHOLD_DAYS = config.get ( 'RENEWAL_THRESHOLD_DAYS', 30 )
 LOOP_PERIOD_SECONDS = config.get ( 'LOOP_PERIOD_SECONDS', 3600 )
 WALLET_ID = config.get ( 'WALLET_ID', 'primary' )
 WALLET_PASSPHRASE = config.get ( 'WALLET_PASSPHRASE', '' )
-WALLET_MNEMONIC = config.get ( 'WALLET_MNEMONIC', '' )
-
 NAMES_JSON_FILE = 'wallet_names.json'
 
 
