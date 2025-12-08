@@ -16,12 +16,15 @@ services:
       --wallet-api-key=your_wallet_api_key
 
   teleshake:
-    image: skywirex/teleshake:v0.4.0
+    image: skywirex/teleshake:v0.5.0
     container_name: teleshake
     network_mode: host
     depends_on:
       - hsd
+    restart: unless-stopped
     volumes:
       - $HOME/docker/teleshake/config.json:/app/config.json
-    entrypoint: ["sh", "-c"]
-    command: ["sleep 3 && exec python ./main.py"]
+    # 3-second delay after hsd starts
+    entrypoint: ["/bin/sh", "-c", "sleep 3 && exec /app/scripts/teleshake.sh"]
+    environment:
+      - LOOP_SECONDS=3600   # or whatever interval you want
