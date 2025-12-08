@@ -1,0 +1,13 @@
+#!/sbin/openrc-run
+
+name="teleshake"
+description="Run teleshake Python app at configurable interval"
+
+command="/app/scripts/teleshake.sh"
+command_background="true"
+pidfile="/run/teleshake.pid"
+
+depend() {
+    need localmount
+    after bootmisc
+}

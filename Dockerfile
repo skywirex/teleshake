@@ -1,32 +1,37 @@
 FROM python:3.13-alpine
 
-RUN apk add --no-cache supervisor supervisor-openrc tzdata
+# OpenRC + tools
+RUN apk add --no-cache openrc tzdata && \
+    rm -rf /var/cache/apk/*
 
 ENV TZ=Asia/Ho_Chi_Minh
 WORKDIR /app
 
+# Virtual environment
 RUN python -m venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
 
+# Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
 COPY . .
 
-COPY supervisor/supervisord.conf /etc/supervisord.conf
-COPY supervisor/conf.d/ /etc/supervisor/conf.d/
+# Copy service files
+COPY scripts/teleshake.sh /app/scripts/teleshake.sh
+COPY init.d/teleshake     /etc/init.d/teleshake
+COPY entrypoint.sh        /entrypoint.sh
 
-# Create /tmp (required for childlogdir)
-RUN mkdir -p /tmp && chmod 1777 /tmp
+# Make executable
+RUN chmod +x /app/scripts/teleshake.sh \
+             /etc/init.d/teleshake \
+             /entrypoint.sh
 
-# Wrapper script
-RUN echo '#!/bin/sh'                                          > /run-hourly.sh && \
-    echo 'while :'                                            >> /run-hourly.sh && \
-    echo 'do'                                                 >> /run-hourly.sh && \
-    echo '  echo "=== $(date \"+%Y-%m-%d %H:%M:%S %Z\") ==="' >> /run-hourly.sh && \
-    echo '  /app/venv/bin/python /app/main.py'                >> /run-hourly.sh && \
-    echo '  echo "Cycle completed. Sleeping 3600s..."'        >> /run-hourly.sh && \
-    echo '  sleep 3600'                                       >> /run-hourly.sh && \
-    echo 'done'                                               >> /run-hourly.sh && \
-    chmod +x /run-hourly.sh
+# OpenRC runtime dirs
+RUN mkdir -p /run/openrc && touch /run/openrc/softlevel
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf", "-n"]
+# Default loop interval (can be overridden at runtime)
+ENV LOOP_SECONDS=3600
+
+ENTRYPOINT ["/entrypoint.sh"]
