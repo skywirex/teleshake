@@ -192,7 +192,7 @@ class WALLET:
         payload = {"passphrase": passphrase, "timeout": timeout}
         return self.post(endpoint, json.dumps(payload))
 
-    def list_wallets(self) -> Dict[str, Any]:
+    def list_wallets(self) -> List[str]:
         """List all wallet IDs."""
         endpoint = '/wallet/'
         return self.get(endpoint)
