@@ -71,11 +71,11 @@ class HSD:
             response = getattr(self.session, method)(url, data=data, timeout=10)
             response.raise_for_status()
             return response.json()
-        except requests.RequestException as e:
-            logger.error(f"Request failed: {e}")
-            return {"error": f"Failed to {method} {endpoint}: {str(e)}"}
-        except ValueError as e:
-            logger.error(f"Invalid JSON response: {e}")
+        except requests.RequestException as exc:
+            logger.error(f"Request failed: {exc}")
+            return {"error": f"Failed to {method} {endpoint}: {str(exc)}"}
+        except ValueError as exc:
+            logger.error(f"Invalid JSON response: {exc}")
             return {"error": f"Invalid JSON response from {endpoint}"}
 
     def get(self, endpoint: str) -> Dict[str, Union[str, dict]]:
