@@ -15,11 +15,9 @@ with open ( CONFIG_FILE, 'r' ) as f:
 
 # Define global variables from config
 RENEWAL_THRESHOLD_DAYS = config.get ( 'RENEWAL_THRESHOLD_DAYS', 30 )
-LOOP_PERIOD_SECONDS = config.get ( 'LOOP_PERIOD_SECONDS', 3600 )
 WALLET_ID = config.get ( 'WALLET_ID', 'primary' )
 WALLET_PASSPHRASE = config.get ( 'WALLET_PASSPHRASE', '' )
 NAMES_JSON_FILE = 'wallet_names.json'
-
 
 def check_wallet_existing(wallet: WALLET) -> None:
     """
