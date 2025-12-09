@@ -16,16 +16,14 @@ def main():
         info = get_wallet_and_node_info(wallet, hsd)
         soonest_expiring = find_soonest_expiring_name()
 
-        # === Build the message exactly like before ===
-        message_lines = [
-            f"<b>Teleshake Update ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})</b>"
-        ]
-        message_lines.append("\n<b>INFO:</b>")
-        message_lines.append(f"Account: <code>{info['account']}</code> | Height: <code>{info['block_height']}</code>")
-        message_lines.append(f"Balance: <code>{info['balance']} HNS</code>")
-        message_lines.append(f"Address: <code>{info['full_receiving_address']}</code>")
+        # === Build the message ===
+        message_lines = [ f"<b>Teleshake Update ({datetime.now ().strftime ( '%Y-%m-%d %H:%M:%S' )})</b>",
+                          "\n<b>INFO:</b>",
+                          f"Account: <code>{info [ 'account' ]}</code> | Height: <code>{info [ 'block_height' ]}</code>",
+                          f"Balance: <code>{info [ 'balance' ]} HNS</code>",
+                          f"Address: <code>{info [ 'full_receiving_address' ]}</code>",
+                          "\n<b>SOONEST EXPIRING NAME:</b>" ]
 
-        message_lines.append("\n<b>SOONEST EXPIRING NAME:</b>")
         if soonest_expiring["name"]:
             message_lines.append(f"Name: <code>{soonest_expiring['name']}</code>")
             message_lines.append(f"Expires: <code>{soonest_expiring['expiration_date']}</code>")
