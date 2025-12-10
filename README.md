@@ -1,37 +1,42 @@
+# TeleShake
+
+## Automatic Handshake Domain Renewal + Telegram Alerts
+
+### Features
+
+- TeleShake automatically checks your Handshake domains and renews them before expiration.
+- Notifications are sent directly to your Telegram chat.
+
+### Note
+
+- This tool is provided “as is.” Use it at your own risk.
+
+![TeleShake bot](https://pub-b731809282d4443bba205fbf4c8ae4ee.r2.dev/e152dd199ec6f4e1e067486d615f6d4f.png)
+
+---
+
 ## Prerequisites
 
-### Docker
-Ensure Docker is installed on your system.
+### **Docker**
+Make sure Docker is installed on your system.
 
-### Telegram Bot
-A Telegram bot must be created via [BotFather](https://t.me/BotFather) to get a `TELEGRAM_BOT_TOKEN`, and you need a `TELEGRAM_CHAT_ID` for the target chat.
+### **Telegram Bot**
 
-#### Create a Telegram Bot:
-1. Open Telegram and start a chat with `@BotFather`.
-2. Send `/newbot`, follow the instructions, and record the bot token (e.g., `123456789:AAF...`).
+You need:
 
-#### Obtain the Chat ID:
-1. Add the bot to a group or send it a direct message.
-2. Send a test message, then retrieve the chat ID using:
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
 
-```bash
-curl https://api.telegram.org/bot<your_bot_token>/getUpdates
-```
+Create a bot Telegram Bot using **@BotFather**, then retrieve your chat ID.  
+More detailed guide: [here](https://skywirex.com/create-telegram-bot-get-chat-id/)
 
-3. In the JSON response, find `"chat":{"id":<chat_id>}` (e.g., `123456789` or `-123456789` for groups).
-4. Alternatively, use `@GetIDsBot` to get the chat ID easily.
+---
 
-#### Test the Bot:
-Send a manual test message to verify setup:
+## Setup TeleShake
 
-```bash
-curl -X POST "https://api.telegram.org/bot<your_bot_token>/sendMessage" -d "chat_id=<your_chat_id>&text=Test message"
-```
+### **1. Run `hsd` Daemon**
 
-### Handshake Node (hsd)
-A running `hsd` instance (with wallet enabled) is required, as `main.py` interacts with it via `HSD_API.py` and `WALLET_API.py`. Ensure it’s configured with API keys and accessible at the addresses/ports specified in `.env`.
-
-#### **hsd daemon**
+You may change `api-key` and `wallet-api-key` as needed.
 
 ```bash
 docker run -d \
@@ -43,62 +48,179 @@ docker run -d \
   --network main \
   --spv \
   --http-host 0.0.0.0 \
-  --api-key=skywirex \
+  --api-key=api \
   --wallet-http-host=0.0.0.0 \
-  --wallet-api-key=skywirex
+  --wallet-api-key=api
+````
+Check endpoint
+
+```bash
+curl http://x:api@127.0.0.1:12037/
 ```
 
-#### **Create config.json file**
+---
 
-Here is the **CLI command to create the directory and the `config.json` file** inside `$HOME/docker/teleshake/` with the sample content. Modify it based on your infor.
+### **2. Import Wallet & Rescan**
+
+Import your seed to the wallet (change `my_imported_wallet` if needed):
+
+```bash
+curl http://x:api@127.0.0.1:12039/wallet/my_imported_wallet \
+  -X PUT \
+  --data '{"passphrase":"my_passphrase", "mnemonic":"<words words words...words>"}'
+```
+
+Rescan wallet from a specific block height:
+
+```bash
+curl http://x:api@127.0.0.1:12039/rescan \
+  -X POST \
+  --data '{"height": 50}'
+```
+
+Check imported wallets:
+
+```bash
+curl http://x:api@127.0.0.1:12039/wallet
+```
+
+---
+
+### **3. Create `config.json`**
+
+Create the Teleshake folder and config file. Modify values to match your setup.
 
 ```bash
 mkdir -p $HOME/docker/teleshake
 
 cat > $HOME/docker/teleshake/config.json << 'EOF'
 {
-  "WALLET_API": "skywirex",
+  "WALLET_API": "api",
   "WALLET_ADDRESS": "127.0.0.1",
   "WALLET_PORT": 12039,
   "WALLET_ID": "primary",
   "WALLET_PASSPHRASE": "your_secure_passphrase",
-  "NODE_API_KEY": "skywirex",
+  "NODE_API_KEY": "api",
   "NODE_HOST": "127.0.0.1",
   "NODE_PORT": 12037,
   "RENEWAL_THRESHOLD_DAYS": 60,
   "TELEGRAM_BOT_TOKEN": "your_bot_token",
-  "TELEGRAM_CHAT_ID": "your_chat_id",
+  "TELEGRAM_CHAT_ID": "your_chat_id"
 }
 EOF
 ```
-#### **teleshake**
+---
+
+### **4. Run Teleshake (Docker)**
 
 ```bash
 docker run -d \
   --name teleshake \
   --network host \
   -v $HOME/docker/teleshake/config.json:/app/config.json \
-  skywirex/teleshake:latest
+  skywirex/teleshake:v0.5.1
 ```
-### Project Structure
+
+⏱ **Default check interval:** 1 hour
+
+---
+
+### **5. Check Services**
+
+```bash
+docker ps -a
+```
+
+```bash
+docker logs teleshake -f
+```
+
+---
+
+### **6. Stop and Remove**
+
+```bash
+docker rm teleshake -f
+```
+
+
+## Deploy with Docker Compose
+
+Create directory:
+
+```bash
+mkdir -p $HOME/docker/teleshake
+```
+
+Create `compose.yml` and `config.json` inside the folder:
+
+```yaml
+---
+services:
+  hsd:
+    image: handshakeorg/hsd:8.0.0
+    container_name: hsd
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - $HOME/.hsd:/root/.hsd
+    command: >
+      --network main
+      --spv
+      --http-host 0.0.0.0
+      --api-key=api
+      --wallet-http-host=0.0.0.0
+      --wallet-api-key=api
+
+  teleshake:
+    image: skywirex/teleshake:v0.5.1
+    container_name: teleshake
+    network_mode: host
+    depends_on:
+      - hsd
+    restart: unless-stopped
+    volumes:
+      - $HOME/docker/teleshake/config.json:/app/config.json
+    entrypoint: ["/bin/sh", "-c", "sleep 3 && exec /app/scripts/teleshake.sh"]
+    environment:
+      - LOOP_SECONDS=3600   # Change as needed
+```
+
+Start services:
+
+```bash
+docker compose up -d
+```
+
+---
+
+## Project Structure
 
 ```
 teleshake/
 ├── .github/
-│   └── workflows/                # GitHub Actions
+│   └── workflows/
 ├── .gitignore
-├── Dockerfile                    # Pure script-based, no OpenRC, no Supervisor
+├── Dockerfile
 ├── LICENSE
 ├── README.md
-├── entrypoint.sh                 # just runs teleshake.sh
-├── main.py                       # Core logic
+├── entrypoint.sh             # Entrypoint → runs teleshake.sh
+├── main.py                   # Core logic
 ├── requirements.txt
 ├── bot_telegram.py
 ├── utils.py
-├── api/                          # Handshake node & wallet API clients
-├── img/                          # Images for README, etc.)
-├── sample/                       # (example configs)
+├── api/                      # Handshake node & wallet API
+├── img/                      # Images and assets
+├── sample/                   # Example configs
 └── scripts/
-    └── teleshake.sh              # The only thing that runs forever
-                                  # → loop + sleep + LOOP_SECONDS env var
+    └── teleshake.sh          # Infinite loop (LOOP_SECONDS-based)
 ```
+
+---
+
+## Donation
+
+🙏 If this tool helps you:
+
+* **HNS:** `hs1q38rkgvqrv6a5m6484q0l52y0ndsdhw9604gtx9`
+* **ETH (EVM):** `0x548Dd6E1794a13BaeFd9cC16fB2340A6be8680d6`
