@@ -6,6 +6,7 @@
 
 - TeleShake automatically checks your Handshake domains and renews them before expiration.
 - Notifications are sent directly to your Telegram chat.
+- The default Docker image supports two architectures: amd and arm64.
 
 ### Note
 
@@ -36,7 +37,7 @@ More detailed guide: [here](https://skywirex.com/create-telegram-bot-get-chat-id
 
 ### **1. Run `hsd` Daemon**
 
-You may change `api-key` and `wallet-api-key` as needed.
+You may change the values of `api-key` and `wallet-api-key` as needed.
 
 ```bash
 docker run -d \
@@ -62,12 +63,12 @@ curl http://x:api@127.0.0.1:12037/
 
 ### **2. Import Wallet & Rescan**
 
-Import your seed to the wallet (change `my_imported_wallet` if needed):
+Import your seed to the wallet (change `imported_wallet` if needed):
 
 ```bash
-curl http://x:api@127.0.0.1:12039/wallet/my_imported_wallet \
+curl http://x:api@127.0.0.1:12039/wallet/imported_wallet \
   -X PUT \
-  --data '{"passphrase":"my_passphrase", "mnemonic":"<words words words...words>"}'
+  --data '{"passphrase":"secretpass123", "mnemonic":"<words words words...words>"}'
 ```
 
 Clear shell history to ensure no leaking mnemonic
@@ -95,18 +96,19 @@ curl http://x:api@127.0.0.1:12039/wallet
 
 ### **3. Create `config.json`**
 
-Create the Teleshake folder and config file. Modify values to match your setup.
+Create the teleshake folder and config file. Modify values to match your setup.
 
 ```bash
 mkdir -p $HOME/docker/teleshake
-
+```
+```bash
 cat > $HOME/docker/teleshake/config.json << 'EOF'
 {
   "WALLET_API": "api",
   "WALLET_ADDRESS": "127.0.0.1",
   "WALLET_PORT": 12039,
   "WALLET_ID": "primary",
-  "WALLET_PASSPHRASE": "your_secure_passphrase",
+  "WALLET_PASSPHRASE": "secretpass123",
   "NODE_API_KEY": "api",
   "NODE_HOST": "127.0.0.1",
   "NODE_PORT": 12037,
@@ -118,7 +120,7 @@ EOF
 ```
 ---
 
-### **4. Run Teleshake (Docker)**
+### **4. Run TeleShake (Docker)**
 
 ```bash
 docker run -d \
@@ -129,6 +131,8 @@ docker run -d \
 ```
 
 ⏱ **Default check interval:** 1 hour
+
+You can change it using `-e LOOP_SECONDS=3600`
 
 ---
 
@@ -148,6 +152,7 @@ docker logs teleshake -f
 
 ```bash
 docker rm teleshake -f
+docker rm hsd -f
 ```
 
 
@@ -180,7 +185,7 @@ services:
       --wallet-api-key=api
 
   teleshake:
-    image: skywirex/teleshake:v0.5.1
+    image: skywirex/teleshake:v0.6.0
     container_name: teleshake
     network_mode: host
     depends_on:
@@ -206,13 +211,12 @@ docker compose up -d
 ```
 teleshake/
 ├── .github/
-│   └── workflows/
 ├── .gitignore
 ├── Dockerfile
 ├── LICENSE
 ├── README.md
-├── entrypoint.sh             # Entrypoint → runs teleshake.sh
-├── main.py                   # Core logic
+├── entrypoint.sh             
+├── main.py                   
 ├── requirements.txt
 ├── bot_telegram.py
 ├── utils.py
@@ -220,7 +224,7 @@ teleshake/
 ├── img/                      # Images and assets
 ├── sample/                   # Example configs
 └── scripts/
-    └── teleshake.sh          # Infinite loop (LOOP_SECONDS-based)
+    └── teleshake.sh          # Infinite loop
 ```
 
 ---
