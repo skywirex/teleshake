@@ -42,18 +42,28 @@ def send_telegram_message ( message: str, parse_mode: str = None ) -> None:
         print ( f"Failed to send Telegram message: {e}" )
 
 
-def interactive_wallet_setup ( wallets: List [ str ] ) -> bool:
+def interactive_wallet_setup ( wallet_instance: Any, wallets: List [ str ] ) -> bool:
     """
     Starts an interactive bot polling session.
-
-    Returns:
-        bool: True if config was successfully updated, False otherwise (e.g., timeout).
+    Verifies passphrase and prints config status Before/After.
     """
     if not bot or not TELEGRAM_CHAT_ID:
         print ( "Telegram bot not configured for interactive setup." )
         return False
 
-    # 1. Construct and send the prompt to the user
+    # --- [CHECK 1] PRINT BEFORE UPDATE ---
+    print ( "\n--------- CHECKING CONFIG FILE (BEFORE) ---------" )
+    try:
+        with open ( CONFIG_FILE, 'r' ) as f:
+            data = json.load ( f )
+            print ( f"Current WALLET_ID:         {data.get ( 'WALLET_ID' )}" )
+            print ( f"Current WALLET_PASSPHRASE: {data.get ( 'WALLET_PASSPHRASE' )}" )
+    except Exception as e:
+        print ( f"Could not read config: {e}" )
+    print ( "-------------------------------------------------\n" )
+    # -------------------------------------------------------
+
+    # 1. Construct and send the prompt
     if wallets:
         wallet_list_str = "\n".join ( [ f"- <code>{w}</code>" for w in wallets ] )
         intro_text = f"The following wallets on your node:\n{wallet_list_str}"
@@ -64,10 +74,8 @@ def interactive_wallet_setup ( wallets: List [ str ] ) -> bool:
         f"<b>⚠️ TeleShake Setup Required ⚠️</b>\n\n"
         f"{intro_text}\n\n"
         f"Input <b>Wallet</b> and <b>Passphrase</b> separated by a colon (:).\n"
-        # --- Notification Added and Timeout Updated ---
-        f"<b>(Response required within 2 minutes)</b>\n"
+        f"<b>(Response required within 5 minutes)</b>\n"
         f"<i>Example:</i>\n<code>skywirex:secretpass123</code>"
-        # ----------------------------------------------
     )
 
     try:
@@ -77,17 +85,11 @@ def interactive_wallet_setup ( wallets: List [ str ] ) -> bool:
         print ( f"Error sending setup message: {e}" )
         return False
 
-    # Use a list to hold the success status so it can be modified inside the nested function
     status = [ False ]
 
     # 2. Define the handler for the user's response
     @bot.message_handler ( func=lambda m: str ( m.chat.id ) == str ( TELEGRAM_CHAT_ID ) )
     def handle_wallet_selection ( message ):
-        # Note: The 'nonlocal' keyword is required if you are using Python 3 and are not relying on a mutable object like a list.
-        # Since we use status[0], which is Python 2 and 3 compatible, 'nonlocal' is not strictly necessary here,
-        # but adding it for robustness if the code environment were to change.
-        # However, for the provided code context and simplicity, we rely on the mutable list `status`.
-
         text = message.text.strip ()
         parts = text.split ( ':', 1 )
 
@@ -99,7 +101,21 @@ def interactive_wallet_setup ( wallets: List [ str ] ) -> bool:
         wallet_id = parts [ 0 ].strip ()
         passphrase = parts [ 1 ].strip ()
 
-        # 3. Update config.json (Overwrites the current JSON configuration file)
+        bot.reply_to ( message, "🔐 Verifying passphrase...", parse_mode="HTML" )
+
+        # --- VERIFICATION ---
+        try:
+            result = wallet_instance.unlock_wallet ( passphrase=passphrase, id=wallet_id )
+            if result.get ( 'success' ) is not True:
+                bot.reply_to ( message, f"❌ <b>Access Denied.</b>\nPassphrase incorrect for '{wallet_id}'. Try again.",
+                               parse_mode="HTML" )
+                return
+        except Exception as e:
+            bot.reply_to ( message, f"❌ <b>Node Error:</b> {e}", parse_mode="HTML" )
+            return
+            # --------------------------
+
+        # 3. Update config.json
         try:
             current_config = load_config ()
             current_config [ 'WALLET_ID' ] = wallet_id
@@ -108,24 +124,28 @@ def interactive_wallet_setup ( wallets: List [ str ] ) -> bool:
             with open ( CONFIG_FILE, 'w' ) as f:
                 json.dump ( current_config, f, indent=2 )
 
-            bot.reply_to ( message,
-                           f"✅ Updated!\n\nWallet: <b>{wallet_id}</b>\n\n⏳ Waiting ...",
-                           parse_mode="HTML" )
-            print ( f"Config updated with wallet: {wallet_id}" )
+            # --- [CHECK 2] PRINT AFTER UPDATE ---
+            print ( "\n--------- CHECKING CONFIG FILE (AFTER) ---------" )
+            with open ( CONFIG_FILE, 'r' ) as f:
+                new_data = json.load ( f )
+                print ( f"New WALLET_ID:         {new_data.get ( 'WALLET_ID' )}" )
+                print ( f"New WALLET_PASSPHRASE: {new_data.get ( 'WALLET_PASSPHRASE' )}" )
+            print ( "------------------------------------------------\n" )
+            # ------------------------------------------------------
 
-            # Set success flag and stop polling
+            bot.reply_to ( message, f"✅ <b>Updated!</b>\n\nWallet: <b>{wallet_id}</b>\n\n ⏳ Waiting ...", parse_mode="HTML" )
+
             status [ 0 ] = True
             bot.stop_polling ()
 
         except Exception as e:
             bot.reply_to ( message, f"Error saving config: {e}" )
-            status [ 0 ] = False  # Ensure status is False on error
+            status [ 0 ] = False
 
-    # 4. Start polling (blocking) until stop_polling is called or timeout occurs
+    # 4. Start polling
     try:
-        bot.polling ( timeout=120 )
-        print ( "Telegram polling finished." )
+        bot.polling ( timeout=300 )
     except Exception as e:
-        print ( f"Telegram polling stopped (possibly due to timeout): {e}" )
+        print ( f"Polling stopped: {e}" )
 
-    return status [ 0 ]  # Return the final success status
+    return status [ 0 ]

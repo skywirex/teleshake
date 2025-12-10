@@ -5,7 +5,7 @@ import importlib
 # Import bot functions and utility for loading config
 from bot_telegram import send_telegram_message, interactive_wallet_setup, load_config
 
-# Import existing utils (Assuming these exist as per your original file)
+# Import existing utils
 from utils import (
     WALLET, HSD, check_wallet_existing, fetch_and_save_names, renew_names,
     get_wallet_and_node_info, find_soonest_expiring_name
@@ -13,50 +13,93 @@ from utils import (
 
 CONFIG_FILE = 'config.json'
 
+
 def main ():
     """Run a single cycle – designed to be called by a script"""
+
+    # Instantiate classes
     wallet = WALLET ()
-    # --- STEP 1: Check Configuration & Interactive Setup ---
-    config = { }
-    setup_successful = False  # Flag to track if the interactive setup completed successfully
 
-    try:
-        config = load_config ()
-        current_wallet_id = config.get ( 'WALLET_ID', '' )
+    # --- STEP 1: Load & Verify Existing Config ---
+    config = load_config ()
+    current_wallet_id = config.get ( 'WALLET_ID', '' )
+    current_passphrase = config.get ( 'WALLET_PASSPHRASE', '' )
 
-        # Check if setup is needed (if wallet is empty, 'primary', or None)
-        if current_wallet_id in [ None, "", "primary" ]:
-            print ( ">>> Wallet ID not configured or set to default ('primary'). Initiating interactive setup..." )
+    setup_needed = False
 
-            wallets = wallet.list_wallets ()
+    # 1. Check if ID is missing or default
+    if current_wallet_id in [ None, "", "primary" ]:
+        print ( ">>> Config Status: Wallet ID not set." )
+        setup_needed = True
 
-            # Start Telegram interaction and capture success
-            setup_successful = interactive_wallet_setup ( wallets )
+    # 2. If ID exists, check if Passphrase is valid by trying to unlock
+    else:
+        print(f">>> Config Status: Found Wallet ID '{current_wallet_id}'. Verifying passphrase...")
+        try:
+            # Attempt to unlock using the method added to utils.py
+            # Using a short timeout just for verification
+            result = wallet.unlock_wallet(passphrase=current_passphrase, id=current_wallet_id, timeout=5)
 
-            if setup_successful:
-                # Reload configuration file after successful update by the bot
-                # This ensures the standard logic runs immediately with the new config.
-                print ( ">>> Configuration successfully updated. Reloading and restarting cycle now..." )
-                config = load_config ()
-
-                # FIX: Reload the utils module
-                if 'utils' in sys.modules:
-                    importlib.reload ( sys.modules [ 'utils' ] )
-                    print ( ">>> utils module reloaded to use new WALLET_ID." )
+            if result.get('success') is True:
+                print(">>> ✅ Passphrase verified successfully.")
             else:
-                print (
-                    ">>> Interactive setup failed or timed out. Proceeding with existing config or default settings." )
+                error_message = f"<b>⚠️ TeleShake ALERT ⚠️</b>\n\n" \
+                                f"<b>Wallet verification FAILED.</b>\n" \
+                                f"Passphrase or wallet is incorrect.\n\n"
+
+                print(">>> ❌ Passphrase verification FAILED. stored passphrase is incorrect.")
+                send_telegram_message(error_message, parse_mode="HTML") # Send alert to Telegram
+
+                setup_needed = True
+
+        except Exception as e:
+            error_message = f"<b>⚠️ TeleShake ALERT ⚠️</b>\n\n" \
+                            f"<b>Node Connection/Verification ERROR.</b>\n" \
+                            f"Could not verify wallet credentials for '<code>{current_wallet_id}</code>'.\n\n" \
+                            f"Error details: <code>{str(e)}</code>\n\n" \
+                            f"Initiating interactive setup via Telegram now."
+
+            print(f">>> ⚠️ Error connecting to node to verify wallet: {e}")
+            send_telegram_message(error_message, parse_mode="HTML") # Send alert to Telegram
+
+            setup_needed = True
 
 
-    except Exception as e:
-        print ( f"Setup Error during config load or interactive process: {e}" )
+    # --- STEP 2: Interactive Setup (If needed) ---
+    if setup_needed:
+        print ( ">>> Initiating interactive setup via Telegram..." )
 
-    # --- STEP 2: Standard Logic (Existing Code) ---
-    # This block executes immediately after the setup block, completing the "restart"
+        # Get list of available wallets
+        try:
+            wallets = wallet.list_wallets ()
+        except:
+            wallets = [ ]
+
+        # Start Telegram interaction (Pass 'wallet' instance for verification)
+        setup_successful = interactive_wallet_setup ( wallet, wallets )
+
+        if setup_successful:
+            print ( ">>> Configuration successfully updated. Reloading config..." )
+            config = load_config ()
+
+            # Reload utils module to ensure it picks up any new global vars if necessary
+            if 'utils' in sys.modules:
+                importlib.reload ( sys.modules [ 'utils' ] )
+                print ( ">>> utils module reloaded." )
+
+            # Re-instantiate wallet with new config
+            wallet = WALLET ()
+        else:
+            print ( ">>> Interactive setup failed or timed out. Exiting cycle." )
+            return  # Stop execution if we don't have a valid wallet
+
+    # --- STEP 3: Standard Logic ---
+    # This block executes only if config is valid (old or newly updated)
     try:
-        # Instantiate classes
-        wallet, hsd = WALLET (), HSD ()
-        check_wallet_existing ( wallet )  # Will fail fast if wallet is missing
+        hsd = HSD ()
+
+        # Double check existence
+        check_wallet_existing ( wallet )
 
         fetch_and_save_names ( wallet )
         renewed_names = renew_names ( wallet )
