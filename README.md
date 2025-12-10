@@ -70,6 +70,13 @@ curl http://x:api@127.0.0.1:12039/wallet/my_imported_wallet \
   --data '{"passphrase":"my_passphrase", "mnemonic":"<words words words...words>"}'
 ```
 
+Clear shell history to ensure no leaking mnemonic
+
+```yaml
+history -c && history -w
+```
+
+
 Rescan wallet from a specific block height:
 
 ```bash
@@ -118,7 +125,7 @@ docker run -d \
   --name teleshake \
   --network host \
   -v $HOME/docker/teleshake/config.json:/app/config.json \
-  skywirex/teleshake:v0.5.1
+  skywirex/teleshake:v0.6.0
 ```
 
 ⏱ **Default check interval:** 1 hour
@@ -222,5 +229,5 @@ teleshake/
 
 🙏 If this tool helps you:
 
-* **HNS:** `hs1q38rkgvqrv6a5m6484q0l52y0ndsdhw9604gtx9`
+* **HNS:** `hs1qwrsfl8vkjqxfdncfn00dtzvpcdcj3rlj70zg3m`
 * **ETH (EVM):** `0x548Dd6E1794a13BaeFd9cC16fB2340A6be8680d6`

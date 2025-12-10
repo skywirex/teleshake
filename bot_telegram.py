@@ -128,9 +128,6 @@ def interactive_wallet_setup ( wallet_instance: Any, wallets: List [ str ] ) -> 
             print ( "\n--------- CHECKING CONFIG FILE (AFTER) ---------" )
             with open ( CONFIG_FILE, 'r' ) as f:
                 new_data = json.load ( f )
-                print ( f"New WALLET_ID:         {new_data.get ( 'WALLET_ID' )}" )
-                print ( f"New WALLET_PASSPHRASE: {new_data.get ( 'WALLET_PASSPHRASE' )}" )
-            print ( "------------------------------------------------\n" )
             # ------------------------------------------------------
 
             bot.reply_to ( message, f"✅ <b>Updated!</b>\n\nWallet: <b>{wallet_id}</b>\n\n ⏳ Waiting ...", parse_mode="HTML" )
