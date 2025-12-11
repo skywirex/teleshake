@@ -96,7 +96,7 @@ curl http://x:api@127.0.0.1:12039/wallet
 
 ### **3. Create `config.json`**
 
-Create the teleshake folder and config file. Modify values to match your setup.
+Create `teleshake` folder and `config.json` file. Modify values to match your setup.
 
 ```bash
 mkdir -p $HOME/docker/teleshake
@@ -127,12 +127,12 @@ docker run -d \
   --name teleshake \
   --network host \
   -v $HOME/docker/teleshake/config.json:/app/config.json \
-  skywirex/teleshake:v0.6.0
+  skywirex/teleshake:v0.6.1
 ```
 
-⏱ **Default check interval:** 1 hour
+⏱ **Default check interval:** 1 hour ~ 3600s
 
-You can change it using `-e LOOP_SECONDS=3600`
+You can change it by adding `-e LOOP_SECONDS=3600`
 
 ---
 
@@ -220,7 +220,7 @@ teleshake/
 ├── requirements.txt
 ├── bot_telegram.py
 ├── utils.py
-├── api/                      # Handshake node & wallet API
+├── api/                      # Handshake node & wallet API for future development
 ├── img/                      # Images and assets
 ├── sample/                   # Example configs
 └── scripts/
