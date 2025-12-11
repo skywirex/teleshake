@@ -1,14 +1,11 @@
-import sys
 from datetime import datetime
-import importlib
 
 # Import bot functions and utility for loading config
 from bot_telegram import send_telegram_message, interactive_wallet_setup, load_config
 
 # Import existing utils
-from utils import (
-    WALLET, HSD, check_wallet_existing, fetch_and_save_names, renew_names,
-    get_wallet_and_node_info, find_soonest_expiring_name
+from name_manager import (
+    WALLET, HSD, HandshakeNameManager
 )
 
 CONFIG_FILE = 'config.json'
@@ -17,8 +14,9 @@ CONFIG_FILE = 'config.json'
 def main ():
     """Run a single cycle – designed to be called by a script"""
 
-    # Instantiate classes
+    # Instantiate API clients (needed early for setup/verification)
     wallet = WALLET ()
+    hsd = HSD ()
 
     # --- STEP 1: Load & Verify Existing Config ---
     config = load_config ()
@@ -34,21 +32,20 @@ def main ():
 
     # 2. If ID exists, check if Passphrase is valid by trying to unlock
     else:
-        print(f">>> Config Status: Found Wallet ID '{current_wallet_id}'. Verifying passphrase...")
+        print ( f">>> Config Status: Found Wallet ID '{current_wallet_id}'. Verifying passphrase..." )
         try:
-            # Attempt to unlock using the method added to utils.py
-            # Using a short timeout just for verification
-            result = wallet.unlock_wallet(passphrase=current_passphrase, id=current_wallet_id, timeout=5)
+            # Attempt to unlock using the method
+            result = wallet.unlock_wallet ( passphrase=current_passphrase, id=current_wallet_id, timeout=5 )
 
-            if result.get('success') is True:
-                print(">>> ✅ Passphrase verified successfully.")
+            if result.get ( 'success' ) is True:
+                print ( ">>> ✅ Passphrase verified successfully." )
             else:
                 error_message = f"<b>⚠️ TeleShake ALERT ⚠️</b>\n\n" \
                                 f"<b>Wallet verification FAILED.</b>\n" \
                                 f"Passphrase or wallet is incorrect.\n\n"
 
-                print(">>> ❌ Passphrase verification FAILED. stored passphrase is incorrect.")
-                send_telegram_message(error_message, parse_mode="HTML") # Send alert to Telegram
+                print ( ">>> ❌ Passphrase verification FAILED. stored passphrase is incorrect." )
+                send_telegram_message ( error_message, parse_mode="HTML" )  # Send alert to Telegram
 
                 setup_needed = True
 
@@ -56,14 +53,13 @@ def main ():
             error_message = f"<b>⚠️ TeleShake ALERT ⚠️</b>\n\n" \
                             f"<b>Node Connection/Verification ERROR.</b>\n" \
                             f"Could not verify wallet credentials for '<code>{current_wallet_id}</code>'.\n\n" \
-                            f"Error details: <code>{str(e)}</code>\n\n" \
+                            f"Error details: <code>{str ( e )}</code>\n\n" \
                             f"Initiating interactive setup via Telegram now."
 
-            print(f">>> ⚠️ Error connecting to node to verify wallet: {e}")
-            send_telegram_message(error_message, parse_mode="HTML") # Send alert to Telegram
+            print ( f">>> ⚠️ Error connecting to node to verify wallet: {e}" )
+            send_telegram_message ( error_message, parse_mode="HTML" )  # Send alert to Telegram
 
             setup_needed = True
-
 
     # --- STEP 2: Interactive Setup (If needed) ---
     if setup_needed:
@@ -75,36 +71,44 @@ def main ():
         except:
             wallets = [ ]
 
-        # Start Telegram interaction (Pass 'wallet' instance for verification)
+        # Start Telegram interaction
         setup_successful = interactive_wallet_setup ( wallet, wallets )
 
         if setup_successful:
             print ( ">>> Configuration successfully updated. Reloading config..." )
+            # Reload config to ensure HandshakeNameManager reads the latest data on instantiation
             config = load_config ()
-
-            # Reload utils module to ensure it picks up any new global vars if necessary
-            if 'utils' in sys.modules:
-                importlib.reload ( sys.modules [ 'utils' ] )
-                print ( ">>> utils module reloaded." )
-
-            # Re-instantiate wallet with new config
-            wallet = WALLET ()
         else:
             print ( ">>> Interactive setup failed or timed out. Exiting cycle." )
             return  # Stop execution if we don't have a valid wallet
 
-    # --- STEP 3: Standard Logic ---
-    # This block executes only if config is valid (old or newly updated)
+    # --- STEP 3: Manager Instantiation & Final Check ---
+    # This block executes if setup passed or wasn't needed.
     try:
-        hsd = HSD ()
+        # Instantiating the manager loads the latest config and runs the initial wallet existence check.
+        manager = HandshakeNameManager (
+            config_path=CONFIG_FILE,
+            wallet=wallet,
+            hsd=hsd
+        )
+    except Exception as e:
+        error_message = f"<b>⚠️ TeleShake ALERT ⚠️</b>\n\n" \
+                        f"<b>Wallet Manager Initialization FAILED.</b>\n" \
+                        f"Could not initialize HandshakeNameManager (e.g., wallet check failed, or bad config).\n" \
+                        f"Error: <code>{str ( e )}</code>\n\n" \
+                        f"Exiting cycle."
+        print ( f">>> ❌ Manager Initialization FAILED: {e}" )
+        send_telegram_message ( error_message, parse_mode="HTML" )
+        return
 
-        # Double check existence
-        check_wallet_existing ( wallet )
+    # --- STEP 4: Standard Logic (Using Manager) ---
+    try:
+        # Check wallet is now done inside HandshakeNameManager.__init__
 
-        fetch_and_save_names ( wallet )
-        renewed_names = renew_names ( wallet )
-        info = get_wallet_and_node_info ( wallet, hsd )
-        soonest_expiring = find_soonest_expiring_name ()
+        manager.fetch_and_save_names ()
+        renewed_names = manager.renew_expiring_names ()  # New method name
+        info = manager.get_status_info ()  # New method name
+        soonest_expiring = manager.get_soonest_expiring_name ()  # New method name
 
         # === Build the message ===
         message_lines = [ f"<b>TeleShake Update ({datetime.now ().strftime ( '%Y-%m-%d %H:%M:%S' )})</b>",
