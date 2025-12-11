@@ -58,10 +58,12 @@ class HandshakeNameManager:
     def check_wallet_exists(self) -> None:
         """Raise error if wallet doesn't exist (no auto-creation)."""
         response = self.wallet.get_wallet_info(self.wallet_id)
-        if "error" in response:
+        # Guard for non-dict responses from the wallet API
+        if not isinstance(response, dict) or "error" in response:
+            error_text = response.get('error') if isinstance(response, dict) else str(response)
             error_msg = (
                 f"Wallet '{self.wallet_id}' does NOT exist.\n"
-                f"Create it manually first. Error: {response.get('error')}"
+                f"Import the Wallet first manually first using `curl` command provided in the README file. Error: {error_text}"
             )
             # Log error but don't crash init if strictly just checking
             print(error_msg)
@@ -69,10 +71,21 @@ class HandshakeNameManager:
         print(f"Wallet '{self.wallet_id}' is ready.")
 
     def _get_expiration_date(self, name_info: Dict[str, Any]) -> datetime:
-        days_until_expire = name_info.get("stats", {}).get("daysUntilExpire")
-        if days_until_expire is None:
-            print(f"Warning: No expiration data for '{name_info['name']}', assuming far future")
+        # Ensure name_info is a dict before using .get()
+        if not isinstance(name_info, dict):
+            print("Warning: name_info is not a dict; assuming far future")
             return datetime.now() + timedelta(days=730)
+
+        stats = name_info.get("stats", {})
+        if not isinstance(stats, dict):
+            stats = {}
+
+        days_until_expire = stats.get("daysUntilExpire")
+        if days_until_expire is None:
+            name_display = name_info.get("name", "<unknown>")
+            print(f"Warning: No expiration data for '{name_display}', assuming far future")
+            return datetime.now() + timedelta(days=730)
+
         return datetime.now() + timedelta(days=days_until_expire)
 
     def fetch_and_save_names(self) -> None:
@@ -83,13 +96,20 @@ class HandshakeNameManager:
 
         names_data = {}
         for name_info in response:
-            name = name_info["name"]
+            if not isinstance(name_info, dict):
+                print("Warning: Skipping non-dict entry in names response")
+                continue
+
+            name = name_info.get("name")
+            if not name:
+                print("Warning: Skipping entry with missing 'name' key")
+                continue
             try:
                 expiration_date = self._get_expiration_date(name_info)
                 names_data[name] = {
                     "expiration_date": expiration_date.isoformat(),
                     "renewal_height": name_info.get("renewal", 0),
-                    "days_until_expire": name_info.get("stats", {}).get("daysUntilExpire"),
+                    "days_until_expire": (name_info.get("stats") or {}).get("daysUntilExpire"),
                 }
             except Exception as e:
                 print(f"Error processing '{name}': {e}")
@@ -141,19 +161,26 @@ class HandshakeNameManager:
 
         # Node info
         node_info = self.hsd.get_info()
-        info["block_height"] = node_info.get("chain", {}).get("height", "Unknown") if "error" not in node_info else "Error"
+        if not isinstance(node_info, dict) or "error" in node_info:
+            info["block_height"] = "Error"
+        else:
+            info["block_height"] = node_info.get("chain", {}).get("height", "Unknown")
 
         # Balance
         balance_info = self.wallet.get_balance(id=self.wallet_id)
-        if "error" not in balance_info:
+        if not isinstance(balance_info, dict) or "error" in balance_info:
+            info["balance"] = "Error"
+        else:
             spendable = (balance_info.get("unconfirmed", 0) - balance_info.get("lockedUnconfirmed", 0)) / 1_000_000
             info["balance"] = round(spendable, 6)
-        else:
-            info["balance"] = "Error"
 
         # Receive address
         acct_info = self.wallet.get_account_info(id=self.wallet_id)
-        full_addr = acct_info.get("receiveAddress", "Error") if "error" not in acct_info else "Error"
+        if not isinstance(acct_info, dict) or "error" in acct_info:
+            full_addr = "Error"
+        else:
+            full_addr = acct_info.get("receiveAddress", "Error")
+
         info["receiving_address"] = f"{full_addr[:8]}...{full_addr[-6:]}" if full_addr != "Error" else "Error"
         info["full_receiving_address"] = full_addr
 
