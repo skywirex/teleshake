@@ -132,7 +132,7 @@ def main ():
         else:
             message_lines.append ( "No names required renewal" )
 
-        message_lines.append("\n<b>SUPPORT & DONATE (🙏)</b>")
+        message_lines.append("\n<b>🙏 SUPPORT & DONATE:</b>")
         message_lines.append("HNS: <code>hs1qwrsfl8vkjqxfdncfn00dtzvpcdcj3rlj70zg3m</code>")
 
 
