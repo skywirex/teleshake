@@ -127,7 +127,7 @@ docker run -d \
   --name teleshake \
   --network host \
   -v $HOME/docker/teleshake/config.json:/app/config.json \
-  skywirex/teleshake:v0.6.1
+  skywirex/teleshake:v0.2.0
 ```
 
 ⏱ **Default check interval:** 1 hour ~ 3600s
