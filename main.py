@@ -132,12 +132,9 @@ def main ():
         else:
             message_lines.append ( "No names required renewal" )
 
-        # --- DONATION ADDRESSES ---
-        message_lines.append("\n\n<b>--- SUPPORT & DONATE ---</b>")
-        message_lines.append("🙏 If this tool helps you:")
+        message_lines.append("\n<b>SUPPORT & DONATE (🙏)</b>")
         message_lines.append("HNS: <code>hs1qwrsfl8vkjqxfdncfn00dtzvpcdcj3rlj70zg3m</code>")
-        message_lines.append("ETH (EVM): <code>0x548Dd6E1794a13BaeFd9cC16fB2340A6be8680d6</code>")
-        # --------------------------------------------------------
+
 
         message = "\n".join ( message_lines )
         send_telegram_message ( message, parse_mode="HTML" )
