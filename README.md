@@ -185,7 +185,7 @@ services:
       --wallet-api-key=api
 
   teleshake:
-    image: skywirex/teleshake:v0.6.0
+    image: skywirex/teleshake:v0.6.1
     container_name: teleshake
     network_mode: host
     depends_on:
@@ -228,6 +228,10 @@ teleshake/
 ```
 
 ---
+
+## Reference 
+
+    * [handywrapper](https://github.com/skunk-ink/handywrapper) 
 
 ## Donation
 
