@@ -58,40 +58,6 @@ class WALLET:
     def __enter__(self):
         """Support context manager entry."""
         return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Close the session when exiting context."""
-        self.session.close()
-        logger.debug("WALLET session closed")
-
-    def get_wallet_info(self, wallet_id: str) -> Dict[str, Any]:
-        """
-        Fetch information about a specific wallet.
-
-        Args:
-            wallet_id (str): The ID of the wallet to query.
-
-        Returns:
-            Dict[str, Any]: Wallet information (e.g., ID, balance).
-
-        Raises:
-            requests.RequestException: If the API call fails after retries.
-        """
-        url = f"{self.base_url}/wallets/{wallet_id}"
-        try:
-            response = self.session.get(url, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            logger.info(f"Successfully fetched wallet info for {wallet_id}")
-            return data
-        except requests.RequestException as e:
-            logger.error(f"Failed to fetch wallet info for {wallet_id}: {str(e)}")
-            raise
-
-    def __enter__(self):
-        """Support context manager entry."""
-        return self
-
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Close the session when exiting context."""
         self.session.close()
@@ -192,7 +158,7 @@ class WALLET:
         payload = {"passphrase": passphrase, "timeout": timeout}
         return self.post(endpoint, json.dumps(payload))
 
-    def list_wallets(self) -> List[str]:
+    def list_wallets(self) -> Dict[str, Any]:
         """List all wallet IDs."""
         endpoint = '/wallet/'
         return self.get(endpoint)
@@ -931,7 +897,7 @@ class WALLET:
         str, Any ]:
         """Lock or unlock transaction outputs."""
         endpoint = '/'
-        params = [ '1' if lock else '0' ]
+        params: List [ Any ] = [ '1' if lock else '0' ]
         if outputs is not None:
             params.append ( outputs )
         payload = { "method": "lockunspent", "params": params }
@@ -1018,7 +984,7 @@ class WALLET:
                         subtract_fee: Optional [ bool ] = None, label: Optional [ str ] = None ) -> Dict [ str, Any ]:
         """Send HNS to multiple addresses."""
         endpoint = '/'
-        params = [ from_account, outputs ]
+        params: List [ Any ] = [ from_account, outputs ]
         if min_confirm is not None or subtract_fee is not None or label is not None:
             params.append ( min_confirm if min_confirm is not None else 1 )
             if subtract_fee is not None or label is not None:
