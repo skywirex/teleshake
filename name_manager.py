@@ -184,6 +184,17 @@ class HandshakeNameManager:
         info["receiving_address"] = f"{full_addr[:8]}...{full_addr[-6:]}" if full_addr != "Error" else "Error"
         info["full_receiving_address"] = full_addr
 
+        # --- Names in Wallet ---
+        # Get count of names from the stored JSON file.
+        try:
+            names_data = self.load_names()
+            info["names_in_wallet"] = len(names_data)
+        except FileNotFoundError:
+            info["names_in_wallet"] = 0
+        except Exception as e:
+            print(f"Error loading names for status info: {e}")
+            info["names_in_wallet"] = "Error"
+
         return info
 
     def get_soonest_expiring_name(self) -> Dict[str, Optional[Any]]:
