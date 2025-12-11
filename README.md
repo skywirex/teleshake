@@ -231,7 +231,7 @@ teleshake/
 
 ## Reference 
 
-    * [handywrapper](https://github.com/skunk-ink/handywrapper) 
+* [handywrapper](https://github.com/skunk-ink/handywrapper) 
 
 ## Donation
 
