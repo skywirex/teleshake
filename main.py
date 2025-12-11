@@ -106,15 +106,15 @@ def main ():
         # Check wallet is now done inside HandshakeNameManager.__init__
 
         manager.fetch_and_save_names ()
-        renewed_names = manager.renew_expiring_names ()  # New method name
-        info = manager.get_status_info ()  # New method name
-        soonest_expiring = manager.get_soonest_expiring_name ()  # New method name
+        renewed_names = manager.renew_expiring_names ()
+        info = manager.get_status_info ()
+        soonest_expiring = manager.get_soonest_expiring_name ()
 
         # === Build the message ===
         message_lines = [ f"<b>TeleShake Update ({datetime.now ().strftime ( '%Y-%m-%d %H:%M:%S' )})</b>",
                           "\n<b>INFO:</b>",
                           f"Account: <code>{info [ 'account' ]}</code> | Height: <code>{info [ 'block_height' ]}</code>",
-                          f"Balance: <code>{info [ 'balance' ]} HNS</code>",
+                          f"Balance: <code>{info [ 'balance' ]} HNS</code> | Name: <code>{info["names_in_wallet"]}</code>",
                           f"Address: <code>{info [ 'full_receiving_address' ]}</code>",
                           "\n<b>SOONEST EXPIRING NAME:</b>" ]
 
