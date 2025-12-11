@@ -3,7 +3,7 @@ FROM python:3.13-alpine
 # Only tzdata needed
 RUN apk add --no-cache tzdata
 
-ENV TZ=Asia/Ho_Chi_Minh
+ENV TZ=UTC
 WORKDIR /app
 
 # Create virtualenv
