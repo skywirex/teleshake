@@ -113,7 +113,7 @@ def main ():
         # === Build the message ===
         message_lines = [ f"<b>TeleShake Update ({datetime.now ().strftime ( '%Y-%m-%d %H:%M:%S' )})</b>",
                           "\n<b>INFO:</b>",
-                          f"AccountID: <code>{info [ 'account' ]}</code> | Height: <code>{info [ 'block_height' ]}</code>",
+                          f"Account: <code>{info [ 'account' ]}</code> | Height: <code>{info [ 'block_height' ]}</code>",
                           f"Balance: <code>{info [ 'balance' ]} HNS</code>",
                           f"Address: <code>{info [ 'full_receiving_address' ]}</code>",
                           "\n<b>SOONEST EXPIRING NAME:</b>" ]
