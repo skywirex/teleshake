@@ -125,6 +125,7 @@ EOF
 ```bash
 docker run -d \
   --name teleshake \
+  --restart unless-stopped \
   --network host \
   -v $HOME/docker/teleshake/config.json:/app/config.json \
   skywirex/teleshake:v0.2.0
