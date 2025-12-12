@@ -63,33 +63,33 @@ curl http://x:api@127.0.0.1:12037/
 
 ### **2. Import Wallet & Rescan**
 
+Temporarily disable history to prevent exposing the mnemonic:
+
+```bash
+set +o history
+```
+
 Import your seed to the wallet (change `imported_wallet` if needed):
 
 ```bash
 curl http://x:api@127.0.0.1:12039/wallet/imported_wallet \
   -X PUT \
-  --data '{"passphrase":"secretpass123", "mnemonic":"<words words words...words>"}'
-```
-
-Clear shell history to ensure no leaking mnemonic
-
-```yaml
-history -c && history -w
-```
-
-
-Rescan wallet from a specific block height:
-
-```bash
-curl http://x:api@127.0.0.1:12039/rescan \
-  -X POST \
-  --data '{"height": 50}'
+  --data '{"passphrase":"secretpass123", "mnemonic":"<words words words...words>"}' \
+  &&
+set -o history 
 ```
 
 Check imported wallets:
 
 ```bash
 curl http://x:api@127.0.0.1:12039/wallet
+```
+Rescan wallet from a specific block height:
+
+```bash
+curl http://x:api@127.0.0.1:12039/rescan \
+  -X POST \
+  --data '{"height": 50}'
 ```
 
 ---
@@ -185,7 +185,7 @@ services:
       --wallet-api-key=api
 
   teleshake:
-    image: skywirex/teleshake:v0.6.1
+    image: skywirex/teleshake:v0.2.0
     container_name: teleshake
     network_mode: host
     depends_on:

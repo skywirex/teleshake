@@ -25,8 +25,8 @@ class HandshakeNameManager:
     def __init__(
         self,
         config_path: str = "config.json",
-        wallet: Optional[WALLET] = None,
-        hsd: Optional[HSD] = None
+        wallet: Optional[Any] = None,
+        hsd: Optional[Any] = None
     ):
         # Initialize API clients
         self.wallet = wallet or WALLET()
@@ -70,7 +70,8 @@ class HandshakeNameManager:
             raise RuntimeError(error_msg)
         print(f"Wallet '{self.wallet_id}' is ready.")
 
-    def _get_expiration_date(self, name_info: Dict[str, Any]) -> datetime:
+    @staticmethod
+    def _get_expiration_date(name_info: Dict[str, Any]) -> datetime:
         # Ensure name_info is a dict before using .get()
         if not isinstance(name_info, dict):
             print("Warning: name_info is not a dict; assuming far future")
@@ -161,25 +162,32 @@ class HandshakeNameManager:
 
         # Node info
         node_info = self.hsd.get_info()
-        if not isinstance(node_info, dict) or "error" in node_info:
-            info["block_height"] = "Error"
+        # Ensure we have a dict and no error key before using dict methods
+        if isinstance(node_info, dict) and "error" not in node_info:
+            chain = node_info.get("chain")
+            if isinstance(chain, dict):
+                info["block_height"] = chain.get("height", "Unknown")
+            else:
+                info["block_height"] = "Unknown"
         else:
-            info["block_height"] = node_info.get("chain", {}).get("height", "Unknown")
+            info["block_height"] = "Error"
 
         # Balance
         balance_info = self.wallet.get_balance(id=self.wallet_id)
-        if not isinstance(balance_info, dict) or "error" in balance_info:
-            info["balance"] = "Error"
-        else:
-            spendable = (balance_info.get("unconfirmed", 0) - balance_info.get("lockedUnconfirmed", 0)) / 1_000_000
+        if isinstance(balance_info, dict) and "error" not in balance_info:
+            unconfirmed = balance_info.get("unconfirmed", 0)
+            locked = balance_info.get("lockedUnconfirmed", 0)
+            spendable = (unconfirmed - locked) / 1_000_000
             info["balance"] = round(spendable, 6)
+        else:
+            info["balance"] = "Error"
 
         # Receive address
         acct_info = self.wallet.get_account_info(id=self.wallet_id)
-        if not isinstance(acct_info, dict) or "error" in acct_info:
-            full_addr = "Error"
-        else:
+        if isinstance(acct_info, dict) and "error" not in acct_info:
             full_addr = acct_info.get("receiveAddress", "Error")
+        else:
+            full_addr = "Error"
 
         info["receiving_address"] = f"{full_addr[:8]}...{full_addr[-6:]}" if full_addr != "Error" else "Error"
         info["full_receiving_address"] = full_addr

@@ -125,7 +125,7 @@ def main ():
         else:
             message_lines.append ( "No names found" )
 
-        message_lines.append ( "\n<b>RENEWAL:</b>" )
+        message_lines.append ( f"\n<b>RENEWAL (in <code>{manager.threshold_days}</code> DAYS):</b>" )
         if renewed_names:
             message_lines.append ( "Renewed the following names:" )
             message_lines.extend ( [ f"- <code>{name}</code>" for name in renewed_names ] )
