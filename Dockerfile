@@ -1,7 +1,7 @@
 FROM python:3.13-alpine
 
-# Only tzdata needed
-RUN apk add --no-cache tzdata
+# Install packages
+RUN apk add --no-cache tzdata curl
 
 ENV TZ=UTC
 WORKDIR /app
