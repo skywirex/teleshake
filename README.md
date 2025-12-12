@@ -194,7 +194,6 @@ services:
     restart: unless-stopped
     volumes:
       - $HOME/docker/teleshake/config.json:/app/config.json
-    entrypoint: ["/bin/sh", "-c", "sleep 3 && exec /app/scripts/teleshake.sh"]
     environment:
       - LOOP_SECONDS=3600   # Change as needed
 ```
