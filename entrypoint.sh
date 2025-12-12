@@ -27,7 +27,7 @@ fi
 
 # --- 3. CHECK HSD VIA HTTP API ---
 
-# Cấu hình API endpoint
+# API endpoint
 
 ENDPOINT="http://x:${NODE_API_KEY}@127.0.0.1:12037"
 
