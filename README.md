@@ -196,6 +196,12 @@ services:
       - $HOME/docker/teleshake/config.json:/app/config.json
     environment:
       - LOOP_SECONDS=3600   # Change as needed
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'teleshake.sh' || exit 1"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 ```
 
 Start services:
