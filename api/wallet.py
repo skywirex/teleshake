@@ -49,7 +49,7 @@ class WALLET:
 
         # Configure requests session with retries and timeouts
         self.session = requests.Session()
-        retries = Retry(total=3, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
+        retries = Retry(total=3, backoff_factor=0.5, status_forcelist=[502, 503, 504])
         adapter = HTTPAdapter(max_retries=retries)
         self.session.mount('http://', adapter)
 
@@ -77,7 +77,7 @@ class WALLET:
         """
         url = f'{self.base_url}{endpoint}'
         try:
-            response = requests.request(method, url, data=data)
+            response = self.session.request(method, url, data=data)
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:

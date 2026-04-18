@@ -44,6 +44,7 @@ class HandshakeNameManager:
         self.wallet_id = self.config.get("WALLET_ID", self.DEFAULT_CONFIG["WALLET_ID"])
         self.passphrase = self.config.get("WALLET_PASSPHRASE", self.DEFAULT_CONFIG["WALLET_PASSPHRASE"])
         self.names_file = self.config.get("NAMES_JSON_FILE", self.DEFAULT_CONFIG["NAMES_JSON_FILE"])
+        self.zap_age_seconds = self.config.get("ZAP_AGE_SECONDS", 86400)
 
         # Validate wallet immediately
         self.check_wallet_exists()
@@ -126,8 +127,20 @@ class HandshakeNameManager:
         with open(self.names_file, 'r') as f:
             return json.load(f)
 
+    def _zap_stuck_transactions(self) -> None:
+        """Zap unconfirmed txs older than zap_age_seconds to free locked coins before renewal."""
+        pending = self.wallet.get_pending_transactions(id=self.wallet_id)
+        if not isinstance(pending, list) or not pending:
+            return
+        print(f"Found {len(pending)} unconfirmed tx(s) — zapping any stuck longer than {self.zap_age_seconds}s...")
+        result = self.wallet.zap_transactions(account="default", id=self.wallet_id, age=self.zap_age_seconds)
+        zapped = result.get("zapped", 0) if isinstance(result, dict) else 0
+        if zapped:
+            print(f"Zapped {zapped} stuck transaction(s)")
+
     def renew_expiring_names(self) -> List[str]:
         """Renew all names expiring within RENEWAL_THRESHOLD_DAYS. Returns renewed names."""
+        self._zap_stuck_transactions()
         try:
             names_data = self.load_names()
         except FileNotFoundError:
