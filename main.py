@@ -16,6 +16,13 @@ def html_escape(value):
     return escape(str(value), quote=False)
 
 
+def load_config_mapping():
+    config = load_config()
+    if not isinstance(config, dict):
+        raise ValueError(f"Config must be a JSON object, got {type(config).__name__}")
+    return config
+
+
 def main ():
     """Run a single cycle – designed to be called by a script"""
 
@@ -25,7 +32,7 @@ def main ():
 
     # --- STEP 1: Load & Verify Existing Config ---
     try:
-        config = load_config ()
+        config = load_config_mapping ()
     except Exception as e:
         print ( f">>> Config Status: Could not load config: {e}" )
         send_telegram_message (
@@ -94,7 +101,7 @@ def main ():
             print ( ">>> Configuration successfully updated. Reloading config..." )
             # Reload config to ensure HandshakeNameManager reads the latest data on instantiation
             try:
-                config = load_config ()
+                config = load_config_mapping ()
             except Exception as e:
                 print ( f">>> Could not reload config after setup: {e}" )
                 send_telegram_message (

@@ -376,7 +376,7 @@ if __name__ == "__main__":
             "days_until_expire": 5
         }
     }
-    with open('wallet_names.json', 'w') as f:
+    with open(manager.names_file, 'w') as f:
         json.dump(mock_names_data, f)
 
     print("\n--- Renewing names nearing expiration ---")
@@ -386,5 +386,5 @@ if __name__ == "__main__":
     # Cleanup
     if created_config and os.path.exists('config.json'):
         os.remove('config.json')
-    if os.path.exists('wallet_names.test.json'):
-        os.remove('wallet_names.test.json')
+    if os.path.exists(manager.names_file):
+        os.remove(manager.names_file)
