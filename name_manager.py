@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from api.hsd import HSD
@@ -323,68 +324,65 @@ class HandshakeNameManager:
 # TEST BLOCK (Mocks included for verification)
 # ==========================================
 if __name__ == "__main__":
-    # 1. Setup Dummy Config
-    created_config = False
-    if not os.path.exists('config.json'):
-        created_config = True
-        with open('config.json', 'w') as f:
+    # 1. Setup isolated temp config and names cache
+    temp_dir = tempfile.TemporaryDirectory()
+    try:
+        test_config_path = os.path.join(temp_dir.name, 'config.json')
+        test_names_file = os.path.join(temp_dir.name, 'wallet_names.test.json')
+        with open(test_config_path, 'w') as f:
             json.dump({
                 "RENEWAL_THRESHOLD_DAYS": 30,
                 "WALLET_ID": "primary",
                 "WALLET_PASSPHRASE": "test",
-                "NAMES_JSON_FILE": "wallet_names.test.json"
+                "NAMES_JSON_FILE": test_names_file
             }, f)
 
-    # 2. Define Mock Classes for testing without live API
-    class MockWallet:
-        def get_wallet_info(self, wallet_id):
-            return {"id": wallet_id}
-        def get_wallet_names_own(self, wallet_id):
-            return [{"name": "test.hns", "renewal": 123, "stats": {"daysUntilExpire": 10}}]
-        def send_renew(self, id, passphrase, name, sign, broadcast):
-            return {"success": True}
-        def get_balance(self, id):
-            return {"unconfirmed": 123500000, "lockedUnconfirmed": 0}
-        def get_account_info(self, id):
-            return {"receiveAddress": "hs1qmockaddress123456789"}
+        # 2. Define Mock Classes for testing without live API
+        class MockWallet:
+            def get_wallet_info(self, wallet_id):
+                return {"id": wallet_id}
+            def get_wallet_names_own(self, wallet_id):
+                return [{"name": "test.hns", "renewal": 123, "stats": {"daysUntilExpire": 10}}]
+            def send_renew(self, id, passphrase, name, sign, broadcast):
+                return {"success": True}
+            def get_balance(self, id):
+                return {"unconfirmed": 123500000, "lockedUnconfirmed": 0}
+            def get_account_info(self, id):
+                return {"receiveAddress": "hs1qmockaddress123456789"}
 
-    class MockHSD:
-        def get_info(self):
-            return {"chain": {"height": 268271}}
+        class MockHSD:
+            def get_info(self):
+                return {"chain": {"height": 268271}}
 
-    # 3. Initialize Manager with Mocks
-    print(">>> Initializing HandshakeNameManager with Mock APIs...")
-    # Passing mocks directly to bypass actual API calls
-    manager = HandshakeNameManager(wallet=MockWallet(), hsd=MockHSD())
+        # 3. Initialize Manager with Mocks
+        print(">>> Initializing HandshakeNameManager with Mock APIs...")
+        # Passing mocks directly to bypass actual API calls
+        manager = HandshakeNameManager(config_path=test_config_path, wallet=MockWallet(), hsd=MockHSD())
 
-    # 4. Run through functionality
-    print("\n--- Fetching names ---")
-    manager.fetch_and_save_names()
+        # 4. Run through functionality
+        print("\n--- Fetching names ---")
+        manager.fetch_and_save_names()
 
-    print("\n--- Current Status ---")
-    print(json.dumps(manager.get_status_info(), indent=2))
+        print("\n--- Current Status ---")
+        print(json.dumps(manager.get_status_info(), indent=2))
 
-    print("\n--- Soonest Expiring Name ---")
-    print(manager.get_soonest_expiring_name())
+        print("\n--- Soonest Expiring Name ---")
+        print(manager.get_soonest_expiring_name())
 
-    # Inject expiring data to test renewal
-    print("\n--- Simulating Expiring Name ---")
-    mock_names_data = {
-        "urgent.hns": {
-            "expiration_date": (datetime.now() + timedelta(days=5)).isoformat(),
-            "renewal_height": 999,
-            "days_until_expire": 5
+        # Inject expiring data to test renewal
+        print("\n--- Simulating Expiring Name ---")
+        mock_names_data = {
+            "urgent.hns": {
+                "expiration_date": (datetime.now() + timedelta(days=5)).isoformat(),
+                "renewal_height": 999,
+                "days_until_expire": 5
+            }
         }
-    }
-    with open(manager.names_file, 'w') as f:
-        json.dump(mock_names_data, f)
+        with open(manager.names_file, 'w') as f:
+            json.dump(mock_names_data, f)
 
-    print("\n--- Renewing names nearing expiration ---")
-    renewed = manager.renew_expiring_names()
-    print(f"Renewed names: {renewed}")
-
-    # Cleanup
-    if created_config and os.path.exists('config.json'):
-        os.remove('config.json')
-    if os.path.exists(manager.names_file):
-        os.remove(manager.names_file)
+        print("\n--- Renewing names nearing expiration ---")
+        renewed = manager.renew_expiring_names()
+        print(f"Renewed names: {renewed}")
+    finally:
+        temp_dir.cleanup()
