@@ -1,4 +1,5 @@
 from datetime import datetime
+from html import escape
 
 # Import bot functions and utility for loading config
 from bot_telegram import send_telegram_message, interactive_wallet_setup, load_config
@@ -11,6 +12,10 @@ from name_manager import (
 CONFIG_FILE = 'config.json'
 
 
+def html_escape(value):
+    return escape(str(value), quote=False)
+
+
 def main ():
     """Run a single cycle – designed to be called by a script"""
 
@@ -19,7 +24,18 @@ def main ():
     hsd = HSD ()
 
     # --- STEP 1: Load & Verify Existing Config ---
-    config = load_config ()
+    try:
+        config = load_config ()
+    except Exception as e:
+        print ( f">>> Config Status: Could not load config: {e}" )
+        send_telegram_message (
+            f"<b>⚠️ TeleShake ALERT ⚠️</b>\n\n"
+            f"<b>Config load FAILED.</b>\n"
+            f"Error details: <code>{html_escape ( e )}</code>\n\n"
+            f"Initiating interactive setup via Telegram now.",
+            parse_mode="HTML"
+        )
+        config = { }
     current_wallet_id = config.get ( 'WALLET_ID', '' )
     current_passphrase = config.get ( 'WALLET_PASSPHRASE', '' )
 
@@ -52,8 +68,8 @@ def main ():
         except Exception as e:
             error_message = f"<b>⚠️ TeleShake ALERT ⚠️</b>\n\n" \
                             f"<b>Node Connection/Verification ERROR.</b>\n" \
-                            f"Could not verify wallet credentials for '<code>{current_wallet_id}</code>'.\n\n" \
-                            f"Error details: <code>{str ( e )}</code>\n\n" \
+                            f"Could not verify wallet credentials for '<code>{html_escape ( current_wallet_id )}</code>'.\n\n" \
+                            f"Error details: <code>{html_escape ( e )}</code>\n\n" \
                             f"Initiating interactive setup via Telegram now."
 
             print ( f">>> ⚠️ Error connecting to node to verify wallet: {e}" )
@@ -77,7 +93,18 @@ def main ():
         if setup_successful:
             print ( ">>> Configuration successfully updated. Reloading config..." )
             # Reload config to ensure HandshakeNameManager reads the latest data on instantiation
-            config = load_config ()
+            try:
+                config = load_config ()
+            except Exception as e:
+                print ( f">>> Could not reload config after setup: {e}" )
+                send_telegram_message (
+                    f"<b>⚠️ TeleShake ALERT ⚠️</b>\n\n"
+                    f"<b>Config reload FAILED after setup.</b>\n"
+                    f"Error: <code>{html_escape ( e )}</code>\n\n"
+                    f"Exiting cycle.",
+                    parse_mode="HTML"
+                )
+                return
         else:
             print ( ">>> Interactive setup failed or timed out. Exiting cycle." )
             return  # Stop execution if we don't have a valid wallet
@@ -95,7 +122,7 @@ def main ():
         error_message = f"<b>⚠️ TeleShake ALERT ⚠️</b>\n\n" \
                         f"<b>Wallet Manager Initialization FAILED.</b>\n" \
                         f"Could not initialize HandshakeNameManager (e.g., wallet check failed, or bad config).\n" \
-                        f"Error: <code>{str ( e )}</code>\n\n" \
+                        f"Error: <code>{html_escape ( e )}</code>\n\n" \
                         f"Exiting cycle."
         print ( f">>> ❌ Manager Initialization FAILED: {e}" )
         send_telegram_message ( error_message, parse_mode="HTML" )
@@ -113,22 +140,22 @@ def main ():
         # === Build the message ===
         message_lines = [ f"<b>TeleShake Update ({datetime.now ().strftime ( '%Y-%m-%d %H:%M:%S' )})</b>",
                           "\n<b>INFO:</b>",
-                          f"Account: <code>{info [ 'account' ]}</code> | Height: <code>{info [ 'block_height' ]}</code>",
-                          f"Balance: <code>{info [ 'balance' ]} HNS</code> | Name: <code>{info["names_in_wallet"]}</code>",
-                          f"Address: <code>{info [ 'full_receiving_address' ]}</code>",
+                          f"Account: <code>{html_escape ( info.get ( 'account', 'Unknown' ) )}</code> | Height: <code>{html_escape ( info.get ( 'block_height', 'Unknown' ) )}</code>",
+                          f"Balance: <code>{html_escape ( info.get ( 'balance', 'Unknown' ) )} HNS</code> | Name: <code>{html_escape ( info.get ( 'names_in_wallet', 'Unknown' ) )}</code>",
+                          f"Address: <code>{html_escape ( info.get ( 'full_receiving_address', 'Unknown' ) )}</code>",
                           "\n<b>SOONEST EXPIRING NAME:</b>" ]
 
         if soonest_expiring [ "name" ]:
-            message_lines.append ( f"Name: <code>{soonest_expiring [ 'name' ]}</code>" )
-            message_lines.append ( f"Expires: <code>{soonest_expiring [ 'expiration_date' ]}</code>" )
-            message_lines.append ( f"Days until expiration: <code>{soonest_expiring [ 'days_until_expire' ]}</code>" )
+            message_lines.append ( f"Name: <code>{html_escape ( soonest_expiring [ 'name' ] )}</code>" )
+            message_lines.append ( f"Expires: <code>{html_escape ( soonest_expiring [ 'expiration_date' ] )}</code>" )
+            message_lines.append ( f"Days until expiration: <code>{html_escape ( soonest_expiring [ 'days_until_expire' ] )}</code>" )
         else:
             message_lines.append ( "No names found" )
 
         message_lines.append ( f"\n<b>RENEWAL (in <code>{manager.threshold_days}</code> DAYS):</b>" )
         if renewed_names:
             message_lines.append ( "Renewed the following names:" )
-            message_lines.extend ( [ f"- <code>{name}</code>" for name in renewed_names ] )
+            message_lines.extend ( [ f"- <code>{html_escape ( name )}</code>" for name in renewed_names ] )
         else:
             message_lines.append ( "No names required renewal" )
 
@@ -141,7 +168,7 @@ def main ():
         print ( f"{datetime.now ()} - Cycle completed successfully." )
 
     except Exception as e:
-        error_message = f"<b>Teleshake ERROR ({datetime.now ().strftime ( '%Y-%m-%d %H:%M' )}):</b>\n{str ( e )}"
+        error_message = f"<b>Teleshake ERROR ({datetime.now ().strftime ( '%Y-%m-%d %H:%M' )}):</b>\n{html_escape ( e )}"
         print ( f"Error: {e}" )
         try:
             send_telegram_message ( error_message, parse_mode="HTML" )

@@ -41,6 +41,14 @@ class HandshakeNameManager:
 
         # Set Configurable values (Merge loaded config with defaults)
         self.threshold_days = self.config.get("RENEWAL_THRESHOLD_DAYS", self.DEFAULT_CONFIG["RENEWAL_THRESHOLD_DAYS"])
+        try:
+            self.threshold_days = int(self.threshold_days)
+        except (TypeError, ValueError):
+            print("Warning: Invalid RENEWAL_THRESHOLD_DAYS; using default")
+            self.threshold_days = self.DEFAULT_CONFIG["RENEWAL_THRESHOLD_DAYS"]
+        if self.threshold_days < 0:
+            print("Warning: Negative RENEWAL_THRESHOLD_DAYS; using 0")
+            self.threshold_days = 0
         self.wallet_id = self.config.get("WALLET_ID", self.DEFAULT_CONFIG["WALLET_ID"])
         self.passphrase = self.config.get("WALLET_PASSPHRASE", self.DEFAULT_CONFIG["WALLET_PASSPHRASE"])
         self.names_file = self.config.get("NAMES_JSON_FILE", self.DEFAULT_CONFIG["NAMES_JSON_FILE"])
@@ -88,13 +96,22 @@ class HandshakeNameManager:
             print(f"Warning: No expiration data for '{name_display}', assuming far future")
             return datetime.now() + timedelta(days=730)
 
+        try:
+            days_until_expire = float(days_until_expire)
+        except (TypeError, ValueError):
+            name_display = name_info.get("name", "<unknown>")
+            print(f"Warning: Invalid expiration data for '{name_display}', assuming far future")
+            return datetime.now() + timedelta(days=730)
+
         return datetime.now() + timedelta(days=days_until_expire)
 
     def fetch_and_save_names(self) -> None:
         """Fetch all owned names from wallet and save to JSON with expiration info."""
         response = self.wallet.get_wallet_names_own(self.wallet_id)
-        if "error" in response:
+        if isinstance(response, dict) and "error" in response:
             raise RuntimeError(f"Failed to fetch names: {response['error']}")
+        if not isinstance(response, list):
+            raise RuntimeError(f"Failed to fetch names: unexpected response type {type(response).__name__}")
 
         names_data = {}
         for name_info in response:
@@ -116,16 +133,27 @@ class HandshakeNameManager:
             except Exception as e:
                 print(f"Error processing '{name}': {e}")
 
-        with open(self.names_file, 'w') as f:
-            json.dump(names_data, f, indent=4)
+        try:
+            with open(self.names_file, 'w') as f:
+                json.dump(names_data, f, indent=4)
+        except OSError as e:
+            raise RuntimeError(f"Failed to write names file '{self.names_file}': {e}") from e
         print(f"Saved {len(names_data)} names to {self.names_file}")
 
     def load_names(self) -> Dict[str, Any]:
         """Load names from JSON file."""
         if not os.path.exists(self.names_file):
             raise FileNotFoundError(f"{self.names_file} not found. Run fetch_and_save_names() first.")
-        with open(self.names_file, 'r') as f:
-            return json.load(f)
+        try:
+            with open(self.names_file, 'r') as f:
+                data = json.load(f)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Names file '{self.names_file}' contains invalid JSON: {e}") from e
+        except OSError as e:
+            raise RuntimeError(f"Failed to read names file '{self.names_file}': {e}") from e
+        if not isinstance(data, dict):
+            raise RuntimeError(f"Names file '{self.names_file}' must contain a JSON object")
+        return data
 
     def _zap_stuck_transactions(self) -> None:
         """Zap unconfirmed txs older than zap_age_seconds to free locked coins before renewal."""
@@ -140,18 +168,31 @@ class HandshakeNameManager:
 
     def renew_expiring_names(self) -> List[str]:
         """Renew all names expiring within RENEWAL_THRESHOLD_DAYS. Returns renewed names."""
-        self._zap_stuck_transactions()
+        try:
+            self._zap_stuck_transactions()
+        except Exception as e:
+            print(f"Warning: Could not zap stuck transactions: {e}")
         try:
             names_data = self.load_names()
         except FileNotFoundError:
             print("No names file found. Please fetch names first.")
+            return []
+        except RuntimeError as e:
+            print(f"Could not load names for renewal: {e}")
             return []
 
         threshold_date = datetime.now() + timedelta(days=self.threshold_days)
         renewed = []
 
         for name, data in names_data.items():
-            exp_date = datetime.fromisoformat(data["expiration_date"])
+            if not isinstance(data, dict):
+                print(f"Warning: Skipping '{name}' with invalid stored data")
+                continue
+            try:
+                exp_date = datetime.fromisoformat(data["expiration_date"])
+            except (KeyError, TypeError, ValueError) as e:
+                print(f"Warning: Skipping '{name}' with invalid expiration_date: {e}")
+                continue
             if exp_date <= threshold_date:
                 print(f"Renewing '{name}' — expires {exp_date.date()}")
                 result = self.wallet.send_renew(
@@ -161,8 +202,10 @@ class HandshakeNameManager:
                     sign=True,
                     broadcast=True
                 )
-                if "error" in result:
+                if isinstance(result, dict) and "error" in result:
                     print(f"Failed to renew '{name}': {result['error']}")
+                elif not isinstance(result, dict):
+                    print(f"Failed to renew '{name}': unexpected response {result}")
                 else:
                     renewed.append(name)
                     print(f"Successfully renewed '{name}'")
@@ -174,7 +217,11 @@ class HandshakeNameManager:
         info = {"account": self.wallet_id}
 
         # Node info
-        node_info = self.hsd.get_info()
+        try:
+            node_info = self.hsd.get_info()
+        except Exception as e:
+            print(f"Error fetching node info: {e}")
+            node_info = {"error": str(e)}
         # Ensure we have a dict and no error key before using dict methods
         if isinstance(node_info, dict) and "error" not in node_info:
             chain = node_info.get("chain")
@@ -186,23 +233,38 @@ class HandshakeNameManager:
             info["block_height"] = "Error"
 
         # Balance
-        balance_info = self.wallet.get_balance(id=self.wallet_id)
+        try:
+            balance_info = self.wallet.get_balance(id=self.wallet_id)
+        except Exception as e:
+            print(f"Error fetching balance: {e}")
+            balance_info = {"error": str(e)}
         if isinstance(balance_info, dict) and "error" not in balance_info:
-            unconfirmed = balance_info.get("unconfirmed", 0)
-            locked = balance_info.get("lockedUnconfirmed", 0)
-            spendable = (unconfirmed - locked) / 1_000_000
-            info["balance"] = round(spendable, 6)
+            try:
+                unconfirmed = balance_info.get("unconfirmed", 0) or 0
+                locked = balance_info.get("lockedUnconfirmed", 0) or 0
+                spendable = (unconfirmed - locked) / 1_000_000
+                info["balance"] = round(spendable, 6)
+            except (TypeError, ValueError):
+                info["balance"] = "Error"
         else:
             info["balance"] = "Error"
 
         # Receive address
-        acct_info = self.wallet.get_account_info(id=self.wallet_id)
+        try:
+            acct_info = self.wallet.get_account_info(id=self.wallet_id)
+        except Exception as e:
+            print(f"Error fetching account info: {e}")
+            acct_info = {"error": str(e)}
         if isinstance(acct_info, dict) and "error" not in acct_info:
             full_addr = acct_info.get("receiveAddress", "Error")
         else:
             full_addr = "Error"
 
-        info["receiving_address"] = f"{full_addr[:8]}...{full_addr[-6:]}" if full_addr != "Error" else "Error"
+        if isinstance(full_addr, str) and full_addr:
+            info["receiving_address"] = f"{full_addr[:8]}...{full_addr[-6:]}" if len(full_addr) > 14 else full_addr
+        else:
+            full_addr = "Error"
+            info["receiving_address"] = "Error"
         info["full_receiving_address"] = full_addr
 
         # --- Names in Wallet ---
@@ -225,7 +287,8 @@ class HandshakeNameManager:
 
         try:
             names_data = self.load_names()
-        except FileNotFoundError:
+        except (FileNotFoundError, RuntimeError) as e:
+            print(f"Could not load names for expiration check: {e}")
             return {"name": None, "expiration_date": None, "days_until_expire": None}
 
         if not names_data:
@@ -235,7 +298,14 @@ class HandshakeNameManager:
         soonest_date = None
 
         for name, data in names_data.items():
-            exp_date = datetime.fromisoformat(data["expiration_date"])
+            if not isinstance(data, dict):
+                print(f"Warning: Skipping '{name}' with invalid stored data")
+                continue
+            try:
+                exp_date = datetime.fromisoformat(data["expiration_date"])
+            except (KeyError, TypeError, ValueError) as e:
+                print(f"Warning: Skipping '{name}' with invalid expiration_date: {e}")
+                continue
             if soonest_date is None or exp_date < soonest_date:
                 soonest_date = exp_date
                 soonest_name = name
@@ -254,12 +324,15 @@ class HandshakeNameManager:
 # ==========================================
 if __name__ == "__main__":
     # 1. Setup Dummy Config
+    created_config = False
     if not os.path.exists('config.json'):
+        created_config = True
         with open('config.json', 'w') as f:
             json.dump({
                 "RENEWAL_THRESHOLD_DAYS": 30,
                 "WALLET_ID": "primary",
-                "WALLET_PASSPHRASE": "test"
+                "WALLET_PASSPHRASE": "test",
+                "NAMES_JSON_FILE": "wallet_names.test.json"
             }, f)
 
     # 2. Define Mock Classes for testing without live API
@@ -311,5 +384,7 @@ if __name__ == "__main__":
     print(f"Renewed names: {renewed}")
 
     # Cleanup
-    if os.path.exists('config.json'):
+    if created_config and os.path.exists('config.json'):
         os.remove('config.json')
+    if os.path.exists('wallet_names.test.json'):
+        os.remove('wallet_names.test.json')
